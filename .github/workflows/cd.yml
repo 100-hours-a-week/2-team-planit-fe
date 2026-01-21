@@ -1,0 +1,63 @@
+name: CD - Frontend
+
+on:
+  workflow_run:
+    workflows: ["CI - Frontend"]
+    types:
+      - completed
+    branches: [main]
+
+jobs:
+  frontend-deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist 
+          path: dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 파일 전송
+      - name: Copy Dist to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "dist/*"
+          target: "/home/ubuntu/temp_dist"
+          strip_components: 1
+
+      # 서버 접속 후 파일 삽입
+      - name: Deploy to Caddy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo rm -rf /usr/share/caddy/dist/*
+            sudo mkdir -p /usr/share/caddy/dist
+            sudo cp -r /home/ubuntu/temp_dist/* /usr/share/caddy/dist/
+            sudo chown -R caddy:caddy /usr/share/caddy/dist
+            rm -rf /home/ubuntu/temp_dist
+            sudo systemctl reload caddy || true
+
+      - name: Send Discord Notification
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            MSG="CD - Frontend 성공"
+          else
+            MSG="CD - Frontend 실패"
+          fi
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"content\": \"${MSG}\n🔗 [로그 확인](${RUN_URL})\"}" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }}
