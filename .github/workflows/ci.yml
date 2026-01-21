@@ -42,7 +42,7 @@ jobs:
           
           
       - name: Send Discord Notification
-        if: always() && (github.ref_name == 'main' || github.base_ref == 'main')
+        if: always()
         run: |
           STATUS="${{ job.status }}"
           if [ "$STATUS" = "success" ]; then
