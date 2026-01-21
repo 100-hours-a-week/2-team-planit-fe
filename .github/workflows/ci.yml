@@ -1,0 +1,58 @@
+name: CI - Frontend
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  frontend-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      - name: Set up Node.js (with npm cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+
+      - name: Install dependencies
+        run: npm ci
+
+
+      - name: Build
+        run: npm run build
+
+
+      - name: Upload dist artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: |
+            dist/**
+          retention-days: 7
+          
+          
+      - name: Send Discord Notification
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            MSG="CI - Frontend 성공"
+          else
+            MSG="CI - Frontend 실패"
+          fi
+
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"content\": \"${MSG}\n[로그 확인하기](${RUN_URL})\"}" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }}
