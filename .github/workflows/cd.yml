@@ -24,30 +24,21 @@ jobs:
       # GitHub Actions IP를 AWS SG에 일시적으로 등록하기
       - name: Get GitHub Actions IP
         id: get-ip
-        run: |
-          IP=$(curl -s https://api.ipify.org)
-          echo "ip=$IP" >> $GITHUB_OUTPUT
-          echo "GitHub Actions IP: $IP"
+        uses: haythem/public-ip@v1.3
 
-      - name: Add IP to Security Group
+      - name: Add IP to SG
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ap-northeast-2
         run: |
-          IP="${{ steps.get-ip.outputs.ip }}"
-          SG_ID="${{ secrets.SECURITY_GROUP_ID }}"
-          
-          # 기존 규칙 확인 및 추가
           aws ec2 authorize-security-group-ingress \
-            --group-id $SG_ID \
+            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
             --protocol tcp \
             --port 22 \
-            --cidr ${IP}/32 \
+            --cidr ${{ steps.get-ip.outputs.ipv4 }}/32 \
             --description "GitHub Actions - Run ID: ${{ github.run_id }}" \
             || echo "IP may already be in security group"
-          
-          echo "Added IP $IP to security group $SG_ID"
 
       # 파일 전송
       - name: Copy Dist to EC2
@@ -83,17 +74,12 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ap-northeast-2
         run: |
-          IP="${{ steps.get-ip.outputs.ip }}"
-          SG_ID="${{ secrets.SECURITY_GROUP_ID }}"
-          
           aws ec2 revoke-security-group-ingress \
-            --group-id $SG_ID \
+            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
             --protocol tcp \
             --port 22 \
-            --cidr ${IP}/32 \
+            --cidr ${{ steps.get-ip.outputs.ipv4 }}/32 \
             || echo "Failed to remove IP or rule not found"
-          
-          echo "Removed IP $IP from security group $SG_ID"
 
       - name: Send Discord Notification
         if: always()
