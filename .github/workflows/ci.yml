@@ -42,15 +42,9 @@ jobs:
           
           
       - name: Send Discord Notification
-        if: always()
+        if: failure()
         run: |
-          STATUS="${{ job.status }}"
-          if [ "$STATUS" = "success" ]; then
-            MSG="CI - Frontend 성공"
-          else
-            MSG="CI - Frontend 실패"
-          fi
-
+          MSG="CI - Frontend 실패"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -H "Content-Type: application/json" \
                -X POST \

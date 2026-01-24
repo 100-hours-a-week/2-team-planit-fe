@@ -1,27 +1,44 @@
-name: CD - Frontend
+name: Rollback - Frontend
 
 on:
-  workflow_run:
-    workflows: ["CI - Frontend"]
-    types:
-      - completed
-    branches: [main]
+  workflow_dispatch:  # 수동 실행
 
 jobs:
-  frontend-deploy:
+  frontend-rollback:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 마지막으로 성공한 CI ID 조회
+      - name: Find CI ID
+        id: find_run
+        run: |
+          RUN_ID=$(gh run list --workflow "CI - Frontend" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "성공한 CI ID를 찾을 수 없습니다."
+            exit 1
+          fi
+          
+          echo "target_id=$RUN_ID" >> $GITHUB_OUTPUT
+          
+          # run_url도 함께 저장 (Discord 알림용)
+          RUN_URL=$(gh run view $RUN_ID --json url --jq '.url')
+          echo "run_url=$RUN_URL" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # CD 실행
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist 
           path: dist
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.find_run.outputs.target_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # GitHub Actions IP를 AWS SG에 일시적으로 등록하기
       - name: Get GitHub Actions IP
         id: get-ip
         uses: haythem/public-ip@v1.3
@@ -40,7 +57,6 @@ jobs:
             || echo "IP may already be in security group"
           sleep 10
 
-      # 파일 전송
       - name: Copy Dist to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -51,7 +67,6 @@ jobs:
           target: "/home/ubuntu/temp_dist"
           strip_components: 1
 
-      # 서버 접속 후 파일 삽입
       - name: Deploy to Caddy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -66,7 +81,6 @@ jobs:
             rm -rf /home/ubuntu/temp_dist
             sudo systemctl reload caddy || true
 
-      # AWS SG에서 IP 제거
       - name: Remove IP from Security Group
         if: always()
         env:
@@ -82,9 +96,15 @@ jobs:
             || echo "Failed to remove IP or rule not found"
 
       - name: Send Discord Notification
-        if: failure()
+        if: always()
         run: |
-          MSG="CD - Frontend 실패"
+          STATUS="${{ job.status }}"
+          CI_RUN_URL="${{ steps.find_run.outputs.run_url }}"
+          if [ "$STATUS" = "success" ]; then
+            MSG="Rollback - Frontend 성공\n 롤백 소스 CI: [링크](${CI_RUN_URL})"
+          else
+            MSG="Rollback - Frontend 실패"
+          fi
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -H "Content-Type: application/json" \
                -X POST \
