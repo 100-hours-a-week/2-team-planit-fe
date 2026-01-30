@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>점검 중</title>
+    <style>
+      :root {
+        background-color: #0f172a;
+        color: #e2e8f0;
+        font-family: "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: radial-gradient(circle at top, #1f2937, #0f172a 70%);
+        text-align: center;
+      }
+      .container {
+        padding: 2rem;
+        border-radius: 1.25rem;
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(6px);
+      }
+      .title {
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+      }
+      .message {
+        font-size: 1rem;
+        margin-bottom: 1.5rem;
+        color: #cbd5f5;
+      }
+      .spinner {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        border: 5px solid rgba(255, 255, 255, 0.15);
+        border-top-color: #ffffff;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
+      .helper {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: #94a3b8;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="title">planIt, 약간 점검중입니다</div>
+      <div class="message">
+        평가하기에는 아직 점검 절차가 끝나지 않았지만, 곧 React 프론트를 다시 보여드릴게요.
+      </div>
+      <div class="spinner"></div>
+      <div class="helper">planIt 프론트, 잠시만 기다려 주세요.</div>
+    </div>
+  </body>
+</html>
