@@ -1,0 +1,253 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import type { AxiosError } from 'axios'
+import { signup } from '../api/auth'
+import { checkLoginId, checkNickname } from '../api/users'
+import type { FormEvent } from 'react'
+
+const LOGIN_ID_PATTERN = /^[a-z0-9_]{4,20}$/
+const PASSWORD_PATTERN = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/
+
+export default function SignupPage() {
+  const navigate = useNavigate()
+  const [loginId, setLoginId] = useState('')
+  const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [nickname, setNickname] = useState('')
+  const [profilePreview, setProfilePreview] = useState<string | null>(null)
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [isLoginIdChecked, setIsLoginIdChecked] = useState(false)
+  const [isNicknameChecked, setIsNicknameChecked] = useState(false)
+  const [loginIdInfo, setLoginIdInfo] = useState('')
+  const [nicknameInfo, setNicknameInfo] = useState('')
+
+  const shouldCheckLoginId = LOGIN_ID_PATTERN.test(loginId)
+  const shouldCheckNickname = nickname.length > 0 && nickname.length <= 10 && !/\s/.test(nickname)
+
+  const canSubmit =
+    isLoginIdChecked &&
+    isNicknameChecked &&
+    password === passwordConfirm &&
+    PASSWORD_PATTERN.test(password)
+
+  const handleLoginIdChange = (value: string) => {
+    setLoginId(value)
+    setIsLoginIdChecked(false)
+    setLoginIdInfo('')
+  }
+
+  const handleNicknameChange = (value: string) => {
+    setNickname(value)
+    setIsNicknameChecked(false)
+    setNicknameInfo('')
+  }
+
+  const handleLoginIdCheck = async () => {
+    if (!shouldCheckLoginId) {
+      setLoginIdInfo('*아이디 형식을 확인해주세요.')
+      setIsLoginIdChecked(false)
+      return
+    }
+    try {
+      const result = await checkLoginId(loginId)
+      setIsLoginIdChecked(result.available)
+      setLoginIdInfo(result.available ? '*사용 가능한 아이디입니다.' : '*중복된 아이디 입니다.')
+    } catch {
+      setIsLoginIdChecked(false)
+      setLoginIdInfo('*아이디 확인에 실패했습니다.')
+    }
+  }
+
+  const handleNicknameCheck = async () => {
+    if (!shouldCheckNickname) {
+      setNicknameInfo('*닉네임을 확인해주세요.')
+      setIsNicknameChecked(false)
+      return
+    }
+    try {
+      const result = await checkNickname(nickname)
+      setIsNicknameChecked(result.available)
+      setNicknameInfo(result.available ? '*사용 가능한 닉네임입니다.' : '*중복된 닉네임 입니다.')
+    } catch {
+      setIsNicknameChecked(false)
+      setNicknameInfo('*닉네임 확인에 실패했습니다.')
+    }
+  }
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0] ?? null
+    if (file) {
+      const url = URL.createObjectURL(file)
+      setProfilePreview(url)
+    } else {
+      setProfilePreview(null)
+    }
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setErrorMessage('')
+
+    if (!canSubmit) {
+      setErrorMessage('*모든 항목을 정확히 입력하고 중복 확인을 완료해주세요.')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+    await signup({
+      loginId,
+      password,
+      passwordConfirm,
+      nickname,
+      profileImageId: null,
+    })
+      navigate('/login')
+    } catch (error) {
+      let message = '*회원가입에 실패했습니다.'
+      if (error && typeof error === 'object') {
+        const axiosError = error as AxiosError<{ message?: string }>
+        message = axiosError.response?.data?.message || axiosError.message || message
+      }
+      setErrorMessage(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="page-shell">
+      <div className="form-card">
+        <header className="form-header">
+          <h1>Planit 회원가입</h1>
+        </header>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="signupLoginId">아이디</label>
+            <div className="field-row">
+              <input
+                id="signupLoginId"
+                name="signupLoginId"
+                className="text-input"
+                value={loginId}
+                onChange={(event) => handleLoginIdChange(event.target.value)}
+                placeholder="영문 소문자, 숫자, _"
+                autoComplete="username"
+              />
+              <button
+                type="button"
+                className="secondary-btn"
+                disabled={!shouldCheckLoginId}
+                onClick={handleLoginIdCheck}
+              >
+                중복 확인
+              </button>
+            </div>
+            <p className="helper-text">
+              {loginIdInfo || '아이디는 4~20자, 영문 소문자/숫자/_만 허용됩니다.'}
+            </p>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="signupPassword">비밀번호</label>
+            <input
+              id="signupPassword"
+              name="signupPassword"
+              className="text-input"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="8자 이상, 대문자/소문자/숫자/특수문자 포함"
+              autoComplete="new-password"
+            />
+            <p className="helper-text">
+              *비밀번호는 8~20자로 대문자/소문자/숫자/특수문자를 각각 한 개 이상 포함해야 합니다.
+            </p>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="signupConfirm">비밀번호 확인</label>
+            <input
+              id="signupConfirm"
+              name="signupConfirm"
+              className="text-input"
+              type="password"
+              value={passwordConfirm}
+              onChange={(event) => setPasswordConfirm(event.target.value)}
+              placeholder="비밀번호를 다시 입력해 주세요"
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="signupNickname">닉네임</label>
+            <div className="field-row">
+              <input
+                id="signupNickname"
+                name="signupNickname"
+                className="text-input"
+                value={nickname}
+                onChange={(event) => handleNicknameChange(event.target.value)}
+                placeholder="공백 없이 10자 이내"
+              />
+              <button
+                type="button"
+                className="secondary-btn"
+                disabled={!shouldCheckNickname}
+                onClick={handleNicknameCheck}
+              >
+                중복 확인
+              </button>
+            </div>
+            <p className="helper-text">{nicknameInfo || '닉네임은 공백 없이 최대 10자입니다.'}</p>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="signupProfile">프로필 사진</label>
+            <div className="upload-slot">
+              <input
+                id="signupProfile"
+                name="signupProfile"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+              />
+              {profilePreview ? (
+                <div className="avatar-preview">
+                  <img src={profilePreview} alt="프로필 미리보기" />
+                  <button
+                    type="button"
+                    className="remove-btn"
+                    onClick={() => setProfilePreview(null)}
+                  >
+                    삭제
+                  </button>
+                </div>
+              ) : (
+                '이미지 업로드'
+              )}
+            </div>
+            <p className="helper-text">
+              {profilePreview ? '이미지가 선택되었습니다.' : '프로필 사진은 선택 사항입니다.'}
+            </p>
+          </div>
+
+          {errorMessage && <p className="error-text">{errorMessage}</p>}
+
+          <button className="primary-btn" type="submit" disabled={!canSubmit || isSubmitting}>
+            {isSubmitting ? '가입 처리중…' : '회원가입 완료'}
+          </button>
+        </form>
+
+        <footer className="form-footer">
+          <span>이미 계정이 있다면</span>
+          <button type="button" className="text-link" onClick={() => navigate('/login')}>
+            로그인
+          </button>
+        </footer>
+      </div>
+    </main>
+  )
+}
