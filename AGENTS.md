@@ -1,6 +1,7 @@
 ## 작업일지
 
 - 2026-02-02: 전체 앱을 웹앱처럼 보이도록 배경/카드/글래스 레이아웃을 도입하고 `main.tsx`에서 `Router`를 `app-shell`/`app-surface`로 감싸 UI를 통일함.
+- 2026-02-02: 게시글 등록/수정 FormData에 `data` JSON Blob을 붙이고 홈 커뮤니티 카드의 탐색은 숫자 `postId`를 사용해 `/api/posts/{id}`로 호출되도록 정비함.
 - 2026-02-02: 알림 API(`src/api/notifications.ts`)와 `NotificationPage`를 만들고 토스트/읽음 처리/전체 읽음/상세 UI를 붙여 알림함을 구현했으며 CSS(`src/index.css`)도 추가하여 리스트/상태문구/카드 스타일을 갖췄음.
 - 2026-02-02: NotificationPage에 cursor 기반 페이징/무한스크롤을 추가하고, `getNotifications`/`NotificationListResponse`를 cursor(size/nextCursor)로 확장하여 더 많은 알림을 순차 로드할 수 있게 개선함.
 - 2026-02-02: NotificationPage 헤더에 뒤로가기/제목/서브텍스트/알림 아이콘+배지, 카드에 인용 텍스트, 상태 메시지, CSS 스타일을 강화하여 요구 UX를 충족시킴.

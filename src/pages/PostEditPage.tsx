@@ -133,9 +133,17 @@ export default function PostEditPage() {
       return
     }
     const form = new FormData()
-    form.append('boardType', 'FREE')
-    form.append('title', title.trim())
-    form.append('content', content.trim())
+    const payload = {
+      boardType: 'FREE',
+      title: title.trim(),
+      content: content.trim(),
+    }
+    form.append(
+      'data',
+      new Blob([JSON.stringify(payload)], {
+        type: 'application/json',
+      }),
+    )
     images.forEach((file) => form.append('images', file))
     setIsSubmitting(true)
     try {

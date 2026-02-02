@@ -82,9 +82,17 @@ export default function PostCreatePage() {
       return
     }
     const form = new FormData()
-    form.append('boardType', boardType)
-    form.append('title', title.trim())
-    form.append('content', content.trim())
+    const payload = {
+      boardType,
+      title: title.trim(),
+      content: content.trim(),
+    }
+    form.append(
+      'data',
+      new Blob([JSON.stringify(payload)], {
+        type: 'application/json',
+      }),
+    )
     images.forEach((file) => form.append('images', file))
 
     setIsSubmitting(true)
