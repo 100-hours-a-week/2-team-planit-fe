@@ -7,6 +7,8 @@ import PostDetailPage from '../pages/PostDetailPage'
 import NotificationPage from '../pages/NotificationPage'
 import MyPage from '../pages/MyPage'
 import ProfilePage from '../pages/ProfilePage'
+import PostCreatePage from '../pages/PostCreatePage'
+import PostEditPage from '../pages/PostEditPage'
 import PrivateRoute from './PrivateRoute'
 
 export default function AppRouter() {
@@ -16,6 +18,8 @@ export default function AppRouter() {
         <Route element={<PrivateRoute />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/posts" element={<PostListPage />} />
+          <Route path="/posts/create" element={<PostCreatePage />} />
+          <Route path="/posts/:id/edit" element={<PostEditPage />} />
           <Route path="/posts/:id" element={<PostDetailPage />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/profile" element={<ProfilePage />} />

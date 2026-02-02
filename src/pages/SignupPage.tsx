@@ -8,6 +8,11 @@ import type { FormEvent } from 'react'
 const LOGIN_ID_PATTERN = /^[a-z0-9_]{4,20}$/
 const PASSWORD_PATTERN = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/
 
+type FieldErrors = {
+  loginId?: string
+  nickname?: string
+}
+
 export default function SignupPage() {
   const navigate = useNavigate()
   const [loginId, setLoginId] = useState('')
@@ -22,6 +27,7 @@ export default function SignupPage() {
   const [isNicknameChecked, setIsNicknameChecked] = useState(false)
   const [loginIdInfo, setLoginIdInfo] = useState('')
   const [nicknameInfo, setNicknameInfo] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
   const shouldCheckLoginId = LOGIN_ID_PATTERN.test(loginId)
   const shouldCheckNickname = nickname.length > 0 && nickname.length <= 10 && !/\s/.test(nickname)
@@ -36,12 +42,14 @@ export default function SignupPage() {
     setLoginId(value)
     setIsLoginIdChecked(false)
     setLoginIdInfo('')
+    setFieldErrors((prev) => ({ ...prev, loginId: undefined }))
   }
 
   const handleNicknameChange = (value: string) => {
     setNickname(value)
     setIsNicknameChecked(false)
     setNicknameInfo('')
+    setFieldErrors((prev) => ({ ...prev, nickname: undefined }))
   }
 
   const handleLoginIdCheck = async () => {
@@ -106,12 +114,25 @@ export default function SignupPage() {
     })
       navigate('/login')
     } catch (error) {
-      let message = '*회원가입에 실패했습니다.'
+      let remainingErrorMessage = '*회원가입에 실패했습니다.'
       if (error && typeof error === 'object') {
-        const axiosError = error as AxiosError<{ message?: string }>
-        message = axiosError.response?.data?.message || axiosError.message || message
+        const axiosError = error as AxiosError<{ code?: string; message?: string }>
+        const code = axiosError.response?.data?.code
+        switch (code) {
+          case 'USER_DUPLICATE_NICKNAME':
+            setFieldErrors((prev) => ({ ...prev, nickname: '이미 사용 중인 닉네임입니다.' }))
+            remainingErrorMessage = ''
+            break
+          case 'USER_DUPLICATE_LOGIN_ID':
+            setFieldErrors((prev) => ({ ...prev, loginId: '이미 사용 중인 아이디입니다.' }))
+            remainingErrorMessage = ''
+            break
+          default:
+            remainingErrorMessage =
+              axiosError.response?.data?.message || axiosError.message || remainingErrorMessage
+        }
       }
-      setErrorMessage(message)
+      setErrorMessage(remainingErrorMessage)
     } finally {
       setIsSubmitting(false)
     }
@@ -127,16 +148,17 @@ export default function SignupPage() {
           <div className="form-group">
             <label htmlFor="signupLoginId">아이디</label>
             <div className="field-row">
-              <input
-                id="signupLoginId"
-                name="signupLoginId"
-                className="text-input"
-                value={loginId}
-                onChange={(event) => handleLoginIdChange(event.target.value)}
-                placeholder="영문 소문자, 숫자, _"
-                autoComplete="username"
-              />
-              <button
+            <input
+              id="signupLoginId"
+              name="signupLoginId"
+              className="text-input"
+              aria-invalid={!!fieldErrors.loginId}
+              value={loginId}
+              onChange={(event) => handleLoginIdChange(event.target.value)}
+              placeholder="영문 소문자, 숫자, _"
+              autoComplete="username"
+            />
+            <button
                 type="button"
                 className="secondary-btn"
                 disabled={!shouldCheckLoginId}
@@ -145,8 +167,8 @@ export default function SignupPage() {
                 중복 확인
               </button>
             </div>
-            <p className="helper-text">
-              {loginIdInfo || '아이디는 4~20자, 영문 소문자/숫자/_만 허용됩니다.'}
+            <p className={`helper-text${fieldErrors.loginId ? ' helper-text--error' : ''}`}>
+              {fieldErrors.loginId || loginIdInfo || '아이디는 4~20자, 영문 소문자/숫자/_만 허용됩니다.'}
             </p>
           </div>
 
@@ -184,14 +206,15 @@ export default function SignupPage() {
           <div className="form-group">
             <label htmlFor="signupNickname">닉네임</label>
             <div className="field-row">
-              <input
-                id="signupNickname"
-                name="signupNickname"
-                className="text-input"
-                value={nickname}
-                onChange={(event) => handleNicknameChange(event.target.value)}
-                placeholder="공백 없이 10자 이내"
-              />
+            <input
+              id="signupNickname"
+              name="signupNickname"
+              className="text-input"
+              aria-invalid={!!fieldErrors.nickname}
+              value={nickname}
+              onChange={(event) => handleNicknameChange(event.target.value)}
+              placeholder="공백 없이 10자 이내"
+            />
               <button
                 type="button"
                 className="secondary-btn"
@@ -201,7 +224,9 @@ export default function SignupPage() {
                 중복 확인
               </button>
             </div>
-            <p className="helper-text">{nicknameInfo || '닉네임은 공백 없이 최대 10자입니다.'}</p>
+            <p className={`helper-text${fieldErrors.nickname ? ' helper-text--error' : ''}`}>
+              {fieldErrors.nickname || nicknameInfo || '닉네임은 공백 없이 최대 10자입니다.'}
+            </p>
           </div>
 
           <div className="form-group">
