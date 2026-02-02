@@ -27,6 +27,7 @@ export default function AppRouter() {
           <Route path="/notifications" element={<NotificationPage />} />
         </Route>
         <Route path="/trips/new" element={<TripCreatePage />} />
+        <Route path="/trips/itineraries" element={<TripCreatePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
