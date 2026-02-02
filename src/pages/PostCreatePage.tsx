@@ -107,6 +107,7 @@ export default function PostCreatePage() {
   }
 
   const contentHint = useMemo(() => `${content.length}/2000`, [content.length])
+  const isFormValid = Boolean(title.trim() && content.trim())
 
   return (
     <main className="post-create-shell">
@@ -166,7 +167,11 @@ export default function PostCreatePage() {
           <button type="button" className="secondary-btn" onClick={() => navigate('/posts')}>
             취소
           </button>
-          <button type="submit" className="primary-btn" disabled={isSubmitting}>
+          <button
+            type="submit"
+            className="primary-btn"
+            disabled={!isFormValid || isSubmitting}
+          >
             {isSubmitting ? '등록 중...' : '등록'}
           </button>
         </div>
