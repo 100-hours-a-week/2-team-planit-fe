@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -206,6 +205,7 @@ export default function PostDetailPage() {
       showToast('게시글 정보를 확인할 수 없습니다.')
       return
     }
+    console.log('submit comment', detail.postId, trimmed)
     setCommentSubmitting(true)
     try {
       await createComment(detail.postId, { content: trimmed })
@@ -255,13 +255,6 @@ export default function PostDetailPage() {
     setLightboxImage(null)
   }
 
-  const headerSubtitle = useMemo(() => {
-    if (!detail) {
-      return ''
-    }
-    return `${detail.boardName} · ${detail.boardDescription}`
-  }, [detail])
-
   const isAuthor = detail?.author.authorId === user?.id
 
   return (
@@ -278,8 +271,16 @@ export default function PostDetailPage() {
         <>
           <section className="post-detail-card">
             <header className="post-detail-header">
-              <p className="post-detail-board">{headerSubtitle}</p>
-              <h1>{detail.title}</h1>
+              <p className="post-detail-board">
+                <span className="post-detail-board__name">{detail.boardName}</span>
+                <span className="post-detail-board__description">{detail.boardDescription}</span>
+              </p>
+              <div className="post-detail-title-row">
+                <h1>{detail.title}</h1>
+                <span className="post-detail-title-time" aria-label="작성 시간">
+                  {formatTimeAgo(detail.createdAt)}
+                </span>
+              </div>
               <div className="post-detail-meta">
                 <div className="post-detail-author">
                   <img
