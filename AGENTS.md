@@ -2,6 +2,11 @@
 
 - 2026-02-02: 전체 앱을 웹앱처럼 보이도록 배경/카드/글래스 레이아웃을 도입하고 `main.tsx`에서 `Router`를 `app-shell`/`app-surface`로 감싸 UI를 통일함.
 - 2026-02-02: 게시글 등록/수정 FormData에 `data` JSON Blob을 붙이고 버튼 활성화·커뮤니티 카드 탐색을 기준대로 정리함.
+- 2026-02-02: 댓글 생성 API를 JSON `Content-Type`으로 호출하고 submit handler에 로그를 두어 요청 흐름/토큰 적용을 추적할 수 있도록 정비함.
+- 2026-02-02: 게시글 상세 헤더/시간/이미지/댓글/좋아요 영역을 UI 명세(게시판 설명, 작성 시간, 이미지 확대/제한, 댓글 리스트/삭제 흐름)와 맞춰 리팩터링함.
+- 2026-02-02: 댓글 리스트 상태를 항상 배열로 안전하게 관리하고 삭제 시 전체 새로고침 대신 state에서 해당 comment만 제거하며 commentCount도 갱신하도록 방어 코드를 추가함.
+- 2026-02-02: 댓글 수 표기를 `comments.length` 기반으로 바꿔 삭제 시 카운트가 목록과 항상 일치하도록 동기화함.
+- 2026-02-02: `PostListPage`가 location key에 따라 state를 초기화하고 다시 fetch해, 댓글 작성/삭제 후 단순 navigation으로 진입해도 서버 데이터를 기준으로 항상 렌더링하도록 보장함.
 - 2026-02-02: 알림 API(`src/api/notifications.ts`)와 `NotificationPage`를 만들고 토스트/읽음 처리/전체 읽음/상세 UI를 붙여 알림함을 구현했으며 CSS(`src/index.css`)도 추가하여 리스트/상태문구/카드 스타일을 갖췄음.
 - 2026-02-02: NotificationPage에 cursor 기반 페이징/무한스크롤을 추가하고, `getNotifications`/`NotificationListResponse`를 cursor(size/nextCursor)로 확장하여 더 많은 알림을 순차 로드할 수 있게 개선함.
 - 2026-02-02: NotificationPage 헤더에 뒤로가기/제목/서브텍스트/알림 아이콘+배지, 카드에 인용 텍스트, 상태 메시지, CSS 스타일을 강화하여 요구 UX를 충족시킴.
