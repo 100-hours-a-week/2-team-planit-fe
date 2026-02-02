@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import { getPosts } from '../api/posts'
@@ -47,6 +47,7 @@ type BoardType = (typeof BOARD_TYPES)[number]
 
 export default function PostListPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [boardType, setBoardType] = useState<BoardType>(BOARD_TYPES[0])
@@ -84,7 +85,7 @@ export default function PostListPage() {
     setHasMore(false)
     setError('')
     setPage(0)
-  }, [boardType, sortOption, searchQuery])
+  }, [boardType, sortOption, searchQuery, location.key])
 
   useEffect(() => {
     let cancelled = false
@@ -131,7 +132,7 @@ export default function PostListPage() {
     return () => {
       cancelled = true
     }
-  }, [boardType, sortOption, searchQuery, page])
+  }, [boardType, sortOption, searchQuery, page, location.key])
 
   useEffect(() => {
     if (!hasMore || isLoading || isLoadingMore) {
