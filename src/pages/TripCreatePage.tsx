@@ -314,6 +314,7 @@ export default function TripCreatePage() {
           setPage('form')
         }
       } catch (error) {
+        console.error('fetchMyItineraries', error)
         showToast('일정 조회에 실패했습니다.')
         setPage('form')
       }
@@ -410,6 +411,7 @@ export default function TripCreatePage() {
                     showToast('일정이 삭제되었습니다.')
                     navigate('/')
                   } catch (error) {
+                    console.error('deleteTrip failed', error)
                     showToast('일정 삭제에 실패했습니다.')
                   }
                 }}
@@ -512,6 +514,7 @@ export default function TripCreatePage() {
                       return { ...prev, itineraries: nextItineraries }
                     })
                   } catch (error) {
+                    console.error('updateTripDay failed', error)
                     showToast('일정 수정에 실패했습니다.')
                   }
                 }}

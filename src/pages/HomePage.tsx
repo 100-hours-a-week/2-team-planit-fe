@@ -286,6 +286,7 @@ export default function HomePage() {
       }
       navigate('/trips/itineraries', { state: { tripData: data } })
     } catch (error) {
+      console.error('handleMyTrips failed', error)
       showToast('일정 조회에 실패했습니다.')
     }
   }
@@ -336,13 +337,6 @@ export default function HomePage() {
     navigate('/login')
   }
 
-  useEffect(() => {
-    if (!user) {
-      setDropdownOpen(false)
-      setHasUnreadNotification(false)
-    }
-  }, [user])
-
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -364,7 +358,7 @@ export default function HomePage() {
           <button type="button" className="notification-button" onClick={handleNotificationClick}>
           <span className="sr-only">알림함</span>
           <span aria-hidden="true">🔔</span>
-          {hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
+          {Boolean(user) && hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
           </button>
           <div className="profile-wrapper">
             <button
