@@ -233,7 +233,7 @@ export default function HomePage() {
       showLoginToast()
       return
     }
-    navigate('/posts')
+    navigate('/trips/new')
   }
 
   const handleTogetherPlan = () => {

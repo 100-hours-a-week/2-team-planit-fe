@@ -7,6 +7,7 @@ import PostDetailPage from '../pages/PostDetailPage'
 import NotificationPage from '../pages/NotificationPage'
 import MyPage from '../pages/MyPage'
 import ProfilePage from '../pages/ProfilePage'
+import TripCreatePage from '../pages/TripCreatePage'
 import PrivateRoute from './PrivateRoute'
 
 export default function AppRouter() {
@@ -21,6 +22,7 @@ export default function AppRouter() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<NotificationPage />} />
         </Route>
+        <Route path="/trips/new" element={<TripCreatePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
