@@ -1,0 +1,514 @@
+.planit-trip {
+  min-height: 100vh;
+  background-color: #fafafa;
+  color: #000;
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+
+.planit-trip .page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.planit-trip .topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  padding-bottom: 12px;
+}
+
+.planit-trip .topbar h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  flex: 1;
+}
+
+.planit-trip .title-block h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.planit-trip .title-block p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #7c7c7c;
+}
+
+.planit-trip .topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.planit-trip .pill-button {
+  background: #f2f2f2;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.planit-trip .pill-button.ghost {
+  background: #fff;
+}
+
+.planit-trip .icon-button {
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.planit-trip .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #e9eef7;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+}
+
+.planit-trip .section {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.planit-trip .section h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.planit-trip .section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.planit-trip .field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.planit-trip .field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.planit-trip label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.planit-trip .required {
+  color: #d92c2c;
+  margin-left: 4px;
+}
+
+.planit-trip .helper {
+  color: #7c7c7c;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.planit-trip .helper.warning {
+  color: #d92c2c;
+  margin-left: 0;
+}
+
+.planit-trip input,
+.planit-trip select,
+.planit-trip .input-button {
+  height: 44px;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 0 12px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.planit-trip input:disabled {
+  background: #f3f3f3;
+  color: #7c7c7c;
+}
+
+.planit-trip .input-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.planit-trip .input-button .placeholder {
+  color: #b0b0b0;
+}
+
+.planit-trip .budget-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planit-trip .unit {
+  font-size: 13px;
+  color: #7c7c7c;
+}
+
+.planit-trip .theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.planit-trip .theme-chip {
+  border: 1px solid #e5e5e5;
+  background: #f8f8f8;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.planit-trip .theme-chip.active {
+  background: #fee500;
+  border-color: #f0d900;
+}
+
+.planit-trip .place-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planit-trip .place-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #fff;
+}
+
+.planit-trip .place-item .remove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.planit-trip .submit {
+  width: 100%;
+  height: 52px;
+  background: #d0d0d0;
+  border-radius: 12px;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.planit-trip .submit:disabled {
+  cursor: not-allowed;
+}
+
+.planit-trip .submit:not(:disabled) {
+  background: #fee500;
+}
+
+.planit-trip .creating {
+  min-height: 100vh;
+}
+
+.planit-trip .creating-body {
+  height: 70vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 16px;
+  color: #fff;
+  background: #bdbdbd;
+  border-radius: 16px;
+  margin-top: 16px;
+}
+
+.planit-trip .creating-body .dots {
+  letter-spacing: 6px;
+  margin-top: 8px;
+}
+
+.planit-trip .schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+}
+
+.planit-trip .tab-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+.planit-trip .tab {
+  padding: 12px 0;
+  background: #f3f3f3;
+  border: none;
+  font-weight: 600;
+  position: relative;
+  cursor: pointer;
+}
+
+.planit-trip .tab.active {
+  background: #fff;
+}
+
+.planit-trip .badge {
+  position: absolute;
+  top: 8px;
+  right: 24px;
+  width: 8px;
+  height: 8px;
+  background: #ff3b30;
+  border-radius: 50%;
+}
+
+.planit-trip .map-box {
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.planit-trip .map-placeholder {
+  height: 220px;
+  background: #e6ebf5;
+  display: grid;
+  place-items: center;
+  color: #7c7c7c;
+}
+
+.planit-trip .map-placeholder.large {
+  height: 340px;
+}
+
+.planit-trip .day-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 0;
+}
+
+.planit-trip .day-tab {
+  border: 1px solid #e5e5e5;
+  background: #f4f4f4;
+  border-radius: 10px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.planit-trip .day-tab.active {
+  background: #fee500;
+  border-color: #f0d900;
+}
+
+.planit-trip .day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.planit-trip .day-label {
+  background: #e5e5e5;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+
+.planit-trip .day-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.planit-trip .day-subtitle {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #7c7c7c;
+}
+
+.planit-trip .timeline {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.planit-trip .activity-card {
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planit-trip .activity-card .order {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #dfe3ea;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  color: #4a4a4a;
+}
+
+.planit-trip .activity-card .time {
+  font-size: 13px;
+  color: #7c7c7c;
+}
+
+.planit-trip .activity-card .name {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+.planit-trip .activity-card .meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #7c7c7c;
+}
+
+.planit-trip .activity-card.restaurant {
+  border-left: 4px solid #ffb347;
+}
+
+.planit-trip .activity-card.attraction {
+  border-left: 4px solid #5bc0eb;
+}
+
+.planit-trip .activity-card.route {
+  border-left: 4px solid #9b9b9b;
+}
+
+.planit-trip .map-modal {
+  width: min(640px, 100%);
+}
+
+.planit-trip .toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 13px;
+  z-index: 50;
+}
+
+.planit-trip .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 40;
+}
+
+.planit-trip .modal {
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e5e5e5;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.planit-trip .modal.small {
+  width: min(420px, 100%);
+}
+
+.planit-trip .modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.planit-trip .modal header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.planit-trip .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planit-trip .modal footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.planit-trip .modal footer.confirm {
+  justify-content: center;
+  gap: 12px;
+}
+
+.planit-trip .place-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.planit-trip .result-box {
+  white-space: pre-wrap;
+  margin: 0;
+  background: #f6f6f6;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #e5e5e5;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .planit-trip .field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .planit-trip .theme-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
