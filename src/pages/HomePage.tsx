@@ -9,7 +9,7 @@ import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
 
 type BoardPost = {
-  id: string
+  postId: number
   boardType: BoardType
   title: string
   content: string
@@ -29,7 +29,7 @@ const BOARD_TYPES: BoardType[] = ['일정 공유', '장소 추천', '자유 게�
 
 const BOARD_POSTS: BoardPost[] = [
   {
-    id: 'community-1',
+    postId: 401,
     boardType: '자유 게시판',
     title: '한라산이 보여준 겨울의 시간표',
     content: '산행 루트부터 온천, 숙소까지 하루 스케줄을 공유합니다.',
@@ -38,7 +38,7 @@ const BOARD_POSTS: BoardPost[] = [
     createdAt: '2026-01-30T09:10:00.000Z',
   },
   {
-    id: 'community-2',
+    postId: 402,
     boardType: '자유 게시판',
     title: '강릉 커피 기행 후기',
     content: '기차를 타고 내려가는 동안 커피집 5곳을 돌았어요.',
@@ -47,7 +47,7 @@ const BOARD_POSTS: BoardPost[] = [
     createdAt: '2026-01-29T15:23:00.000Z',
   },
   {
-    id: 'community-3',
+    postId: 403,
     boardType: '자유 게시판',
     title: '서울 근교 캠핑 조합',
     content: '데이트, 가족, 친구별로 추천하는 캠핑장 리스트입니다.',
@@ -56,7 +56,7 @@ const BOARD_POSTS: BoardPost[] = [
     createdAt: '2026-01-28T21:40:00.000Z',
   },
   {
-    id: 'community-4',
+    postId: 404,
     boardType: '자유 게시판',
     title: '한강 피크닉 장비',
     content: '돗자리부터 전기버너까지 실물 후기 남겨요.',
@@ -65,7 +65,7 @@ const BOARD_POSTS: BoardPost[] = [
     createdAt: '2026-01-27T18:10:00.000Z',
   },
   {
-    id: 'community-5',
+    postId: 405,
     boardType: '자유 게시판',
     title: '간사이 3박4일 기록',
     content: '지하철 패스, 식사, 쇼핑 포인트를 시간대 별로 정리했습니다.',
@@ -260,12 +260,12 @@ export default function HomePage() {
     setSelectedBoardType(type)
   }
 
-  const handlePostClick = (id: string) => {
+  const handlePostClick = (postId: number) => {
     if (!loggedIn) {
       showLoginToast()
       return
     }
-    navigate(`/posts/${id}`)
+    navigate(`/posts/${postId}`)
   }
 
   const handleNavigateLogin = () => {
@@ -383,14 +383,14 @@ export default function HomePage() {
           <div className="board-list">
             {sortedBoardPosts.map((post) => (
               <article
-                key={post.id}
+                key={post.postId}
                 className="board-card"
                 role="button"
                 tabIndex={0}
-                onClick={() => handlePostClick(post.id)}
+                onClick={() => handlePostClick(post.postId)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
-                    handlePostClick(post.id)
+                    handlePostClick(post.postId)
                   }
                 }}
               >

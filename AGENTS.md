@@ -1,5 +1,25 @@
 ## 작업일지
 
+- 2026-02-02: 전체 앱을 웹앱처럼 보이도록 배경/카드/글래스 레이아웃을 도입하고 `main.tsx`에서 `Router`를 `app-shell`/`app-surface`로 감싸 UI를 통일함.
+- 2026-02-02: 게시글 등록/수정 FormData에 `data` JSON Blob을 붙이고 홈 커뮤니티 카드의 탐색은 숫자 `postId`를 사용해 `/api/posts/{id}`로 호출되도록 정비함.
+- 2026-02-02: 알림 API(`src/api/notifications.ts`)와 `NotificationPage`를 만들고 토스트/읽음 처리/전체 읽음/상세 UI를 붙여 알림함을 구현했으며 CSS(`src/index.css`)도 추가하여 리스트/상태문구/카드 스타일을 갖췄음.
+- 2026-02-02: NotificationPage에 cursor 기반 페이징/무한스크롤을 추가하고, `getNotifications`/`NotificationListResponse`를 cursor(size/nextCursor)로 확장하여 더 많은 알림을 순차 로드할 수 있게 개선함.
+- 2026-02-02: NotificationPage 헤더에 뒤로가기/제목/서브텍스트/알림 아이콘+배지, 카드에 인용 텍스트, 상태 메시지, CSS 스타일을 강화하여 요구 UX를 충족시킴.
+- 2026-02-01: 프론트 게시물 목록/상세/정렬 동작이 이미 요구 사항에 맞게 구현되어 있는지를 검토하고, 별도 변경 없이 스펙을 만족하는 상태임을 확인함.
+- 2026-02-01: 게시물 수정 UI를 기존 게시글 정보로 초기화한 뒤 FormData로 `updatePostForm`을 호출하고 저장/취소 흐름을 구성함.
+- 2026-02-01: 게시물 작성 UI를 폼/이미지 미리보기/검증/Toast 피드백과 함께 구성하고 multipart `createPostForm` helper를 추가하여 서버에 전달하도록 구현함.
+- 2026-02-01: PostDetailResponse 기반 댓글/좋아요/삭제 API helper와 라이트박스/모달/댓글 무한스크롤 입출력 UI를 정비하여 상세 페이지를 재구성함.
+- 2026-02-01: 게시물 목록 v1 요구사항(탭 보드, 검색 helper text, 정렬 드롭다운, 무한스크롤, 글쓰기/뒤로가기 버튼, toast 피드백)과 PostCreatePage 라우트를 반영하여 리스트 UI/라우터를 재작성함.
+- 2026-01-31: auth를 단일 `authStore` 객체로 재정비해 localStorage `auth`에 user+accessToken을 저장/복구하고 axios/라우터/로그인/마이페이지가 새 store를 사용해 profileImageUrl(서버 URL) 기반 UI로 동작하게 정리함.
+- 2026-01-30: 마이페이지 화면 전면 리빌드, dropdown/modal/toast 컴포넌트 추가, 탈퇴·계획·프로필/수정/plan API 연동 및 카카오 톤 CSS 확장.
+- 2026-01-30: Axios 응답 인터셉터에서 401 시 전역 리다이렉트/로그아웃을 제거하고 `auth.me()`를 `/users/me`로 맞춰 오류 시점에도 로그인 유지하도록 조정함.
+- 2026-01-30: 메인 페이지 헤더/커뮤니티/추천 섹션을 카드를 중심으로 재작성하고 알림 badge, 프로필 드롭다운, 로그인 안내 toast/NotificationPage 라우트를 정비함.
+- 2026-01-30: Axios request 인터셉터에서 headers 초기값을 보장해 accessToken이 Authorization 헤더로 붙지 않아 발생하던 401 에러를 제거함.
+- 2026-01-30: AuthContext/Provider를 추가해 로그인 시 사용자 정보를 전역으로 관리하고 Home/MyPage/Header의 프로필 업로드/프리뷰 로직을 리팩토링함.
+- 2026-01-30: `src/store/index.ts` export 경로를 `.tsx`로 명시하여 Vite가 `/src/store/auth.ts` 404를 호출하지 않도록 정비하고 앱 부팅이 안전하게 유지되도록 확인함.
+- 2026-01-30: Auth context를 단일 소스로 정리해 profileImageUrl/로그아웃을 공유하고 MyPage 닉네임 중복 확인·파일 업로드·헤더 드롭다운을 state/UX 요구사항에 맞게 재구성함.
+- 2026-01-30: auth 상태의 저장 키를 `user`로 통합해 profileImageUrl을 포함한 전체 user 객체를 localStorage에 유지하고, MyPage에서 드롭다운 비활성화+입력 정리 및 프로필 업로드 UX를 정비함.
+- 2026-01-30: ProfileDropdown 메뉴를 로그인/회원가입/로그아웃 중심으로 재정비하고, 공통 auth user.profileImageUrl이 헤더/마이페이지에 동기화되도록 구현하며 마이페이지에서는 드롭다운이 열리지 않게 제어함.
 - 2026-01-29: `src/pages/HomePage.tsx` 내부 `fetch` 경로를 백엔드 실제 API 경로(`http://localhost:8080/api/posts`)로 수정함.
 - 2026-01-29: posts API 응답 구조 `{ posts, hasMore }` 타입 정의와 axios 클라이언트(기본 `http://localhost:8080/api`)를 만들고 `PostListPage`에서 `getPosts`로 렌더링함.
 - 2026-01-29: `src/api/axios.ts`에서 `VITE_API_BASE_URL` 전용으로 axios 인스턴스를 생성하도록 수정함.
@@ -12,13 +32,3 @@
 - 2026-01-29: 로그인/회원가입 페이지를 모바일 퍼스트 카드 레이아웃으로 전면 재작성하고 helper/중복 확인/프로필 업로드/카카오 스타일 CSS를 정비했으며 axios/auth/users API 흐름을 백엔드 스펙에 맞춰 조정함.
 - 2026-01-29: axios request 인터셉터에 `localStorage`의 `accessToken`을 읽어 `Authorization: Bearer` 헤더를 붙이도록 설정함.
 - 2026-01-29: `auth.ts`의 로그인 엔드포인트를 `/auth/login`으로 조정하고 `LoginRequest/LoginResponse` 타입을 명시함.
-- 2026-01-30: 마이페이지 화면 전면 리빌드, dropdown/modal/toast 컴포넌트 추가, 탈퇴·계획·프로필/수정/plan API 연동 및 카카오 톤 CSS 확장.
-- 2026-01-30: Axios 응답 인터셉터에서 401 시 전역 리다이렉트/로그아웃을 제거하고 `auth.me()`를 `/users/me`로 맞춰 오류 시점에도 로그인 유지하도록 조정함.
-- 2026-01-30: 메인 페이지 헤더/커뮤니티/추천 섹션을 카드를 중심으로 재작성하고 알림 badge, 프로필 드롭다운, 로그인 안내 toast/NotificationPage 라우트를 정비함.
-- 2026-01-30: Axios request 인터셉터에서 headers 초기값을 보장해 accessToken이 Authorization 헤더로 붙지 않아 발생하던 401 에러를 제거함.
-- 2026-01-30: AuthContext/Provider를 추가해 로그인 시 사용자 정보를 전역으로 관리하고 Home/MyPage/Header의 프로필 업로드/프리뷰 로직을 리팩터링함.
-- 2026-01-30: `src/store/index.ts` export 경로를 `.tsx`로 명시하여 Vite가 `/src/store/auth.ts` 404를 호출하지 않도록 정비하고 앱 부팅이 안전하게 유지되도록 확인함.
-- 2026-01-30: Auth context를 단일 소스로 정리해 profileImageUrl/로그아웃을 공유하고 MyPage 닉네임 중복 확인·파일 업로드·헤더 드롭다운을 state/UX 요구사항에 맞게 재구성함.
-- 2026-01-30: auth 상태의 저장 키를 `user`로 통합해 profileImageUrl을 포함한 전체 user 객체를 localStorage에 유지하고, MyPage에서 드롭다운 비활성화+입력 정리 및 프로필 업로드 UX를 정비함.
-- 2026-01-30: ProfileDropdown 메뉴를 로그인/회원가입/로그아웃 중심으로 재정비하고, 공통 auth user.profileImageUrl이 헤더/마이페이지에 동기화되도록 구현하며 마이페이지에서는 드롭다운이 열리지 않게 제어함.
-- 2026-01-31: auth를 단일 `authStore` 객체로 재정비해 localStorage `auth`에 user+accessToken을 저장/복구하고 axios/라우터/로그인/마이페이지가 새 store를 사용해 profileImageUrl(서버 URL) 기반 UI로 동작하게 정리함.

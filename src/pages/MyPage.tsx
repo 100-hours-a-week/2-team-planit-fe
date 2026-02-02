@@ -184,6 +184,14 @@ export default function MyPage() {
 
   useEffect(() => {
     let cancelled = false
+    if (!authUser) {
+      setPlans([])
+      setPlanError('')
+      setRowsLoading(false)
+      return () => {
+        cancelled = true
+      }
+    }
     setRowsLoading(true)
     setPlanError('')
     fetchPlans()
@@ -214,7 +222,7 @@ export default function MyPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [authUser])
 
   useEffect(() => {
     return () => {
