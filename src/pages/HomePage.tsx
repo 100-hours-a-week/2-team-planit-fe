@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ProfileDropdown from '../components/ProfileDropdown'
 import Toast from '../components/Toast'
@@ -183,30 +183,51 @@ export default function HomePage() {
   const loggedIn = Boolean(user)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
-  const [notificationCount, setNotificationCount] = useState(0)
+  const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
+
+  const fetchNotificationCount = useCallback(
+    async (isCancelled = () => false) => {
+      if (!loggedIn) {
+        setHasUnreadNotification(false)
+        return
+      }
+      try {
+        const result = await getMyPage()
+        if (!isCancelled()) {
+          setHasUnreadNotification(result.notificationCount > 0)
+        }
+      } catch {
+        if (!isCancelled()) {
+          setHasUnreadNotification(false)
+        }
+      }
+    },
+    [loggedIn],
+  )
 
   useEffect(() => {
     let cancelled = false
-    if (!loggedIn) {
-      setNotificationCount(0)
-      return undefined
-    }
-    getMyPage()
-      .then((result) => {
-        if (!cancelled) {
-          setNotificationCount(result.notificationCount)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setNotificationCount(0)
-        }
-      })
+    fetchNotificationCount(() => cancelled)
     return () => {
       cancelled = true
     }
-  }, [loggedIn])
+  }, [fetchNotificationCount])
+
+  useEffect(() => {
+    const handleUnreadBadgeUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ count: number }> | undefined)?.detail
+      if (detail === undefined) {
+        fetchNotificationCount()
+        return
+      }
+      setHasUnreadNotification(detail.count > 0)
+    }
+    window.addEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
+    return () => {
+      window.removeEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
+    }
+  }, [fetchNotificationCount])
 
   const showToast = (message: string) => {
     setToastInfo({ message, key: Date.now() })
@@ -285,7 +306,7 @@ export default function HomePage() {
 
   const handleLogout = () => {
     clearAuth()
-    setNotificationCount(0)
+    setHasUnreadNotification(false)
     setDropdownOpen(false)
     navigate('/login')
   }
@@ -309,11 +330,9 @@ export default function HomePage() {
         </h1>
         <div className="header-actions">
           <button type="button" className="notification-button" onClick={handleNotificationClick}>
-            <span className="sr-only">알림함</span>
-            <span aria-hidden="true">🔔</span>
-            {notificationCount > 0 && (
-              <span className="notification-badge">{notificationCount > 99 ? '99+' : notificationCount}</span>
-            )}
+          <span className="sr-only">알림함</span>
+          <span aria-hidden="true">🔔</span>
+          {hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
           </button>
           <div className="profile-wrapper">
             <button

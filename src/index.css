@@ -141,6 +141,17 @@ body {
   font-size: 1.4rem;
 }
 
+.notification-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #dd1a35;
+  border: 2px solid #fff;
+}
+
 .notification-badge {
   position: absolute;
   right: 6px;
