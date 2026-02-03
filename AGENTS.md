@@ -7,6 +7,9 @@
 - 2026-02-02: 댓글 리스트 상태를 항상 배열로 안전하게 관리하고 삭제 시 전체 새로고침 대신 state에서 해당 comment만 제거하며 commentCount도 갱신하도록 방어 코드를 추가함.
 - 2026-02-02: 댓글 수 표기를 `comments.length` 기반으로 바꿔 삭제 시 카운트가 목록과 항상 일치하도록 동기화함.
 - 2026-02-02: `PostListPage`가 location key에 따라 state를 초기화하고 다시 fetch해, 댓글 작성/삭제 후 단순 navigation으로 진입해도 서버 데이터를 기준으로 항상 렌더링하도록 보장함.
+- 2026-02-02: 알림 API 응답이 빈 배열이나 다른 필드명을 써도 에러 없이 처리하도록 guard를 추가하고, 로딩/에러 상태를 분리해 UI가 죽지 않도록 방어함.
+- 2026-02-02: 알림 읽음 처리 후 `GET /notifications/unread-count`을 호출해 전역 뱃지를 갱신하고, 메인 헤더는 숫자 대신 `hasUnread` boolean으로 빨간 점만 보여주는 방식으로 단순화함.
+- 2026-02-02: 알림 읽음 처리에서 POST를 PATCH로 변경하고 전체 읽음 버튼/호출을 제거해 현재 백엔드 스펙에 맞추며 즉시 상태를 업데이트함.
 - 2026-02-02: 알림 API(`src/api/notifications.ts`)와 `NotificationPage`를 만들고 토스트/읽음 처리/전체 읽음/상세 UI를 붙여 알림함을 구현했으며 CSS(`src/index.css`)도 추가하여 리스트/상태문구/카드 스타일을 갖췄음.
 - 2026-02-02: NotificationPage에 cursor 기반 페이징/무한스크롤을 추가하고, `getNotifications`/`NotificationListResponse`를 cursor(size/nextCursor)로 확장하여 더 많은 알림을 순차 로드할 수 있게 개선함.
 - 2026-02-02: NotificationPage 헤더에 뒤로가기/제목/서브텍스트/알림 아이콘+배지, 카드에 인용 텍스트, 상태 메시지, CSS 스타일을 강화하여 요구 UX를 충족시킴.

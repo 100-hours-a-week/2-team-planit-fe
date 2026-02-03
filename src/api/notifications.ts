@@ -18,6 +18,10 @@ export interface NotificationListResponse {
   nextCursor?: number | null
 }
 
+export interface NotificationUnreadCountResponse {
+  unreadCount: number
+}
+
 const BASE_PATH = '/notifications'
 
 export interface NotificationListParams {
@@ -32,9 +36,10 @@ export async function getNotifications(params?: NotificationListParams): Promise
 }
 
 export async function markNotificationRead(notificationId: number): Promise<void> {
-  await api.post(`${BASE_PATH}/${notificationId}/read`)
+  await api.patch(`${BASE_PATH}/${notificationId}/read`)
 }
 
-export async function markNotificationsReadAll(): Promise<void> {
-  await api.post(`${BASE_PATH}/read-all`)
+export async function getUnreadNotificationCount(): Promise<NotificationUnreadCountResponse> {
+  const response = await api.get<NotificationUnreadCountResponse>(`${BASE_PATH}/unread-count`)
+  return response.data
 }
