@@ -6,6 +6,7 @@ import { getMyPage } from '../api/users'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import { getImageUrl } from '../utils/image'
+import { createToastInfo } from '../utils/toast'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
 
@@ -187,6 +188,7 @@ export default function HomePage() {
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
+  const dropdownIsOpen = Boolean(user) && dropdownOpen
 
   const fetchNotificationCount = useCallback(
     async (isCancelled?: () => boolean) => {
@@ -194,7 +196,7 @@ export default function HomePage() {
         setHasUnreadNotification(false)
         return
       }
-    const shouldCancel: () => boolean = isCancelled ?? (() => false)
+      const shouldCancel: () => boolean = isCancelled ?? (() => false)
       try {
         const result = await getMyPage()
         if (!shouldCancel()) {
@@ -211,7 +213,10 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false
-      fetchNotificationCount(() => cancelled)
+    const run = async () => {
+      await fetchNotificationCount(() => cancelled)
+    }
+    run()
     return () => {
       cancelled = true
     }
@@ -232,9 +237,9 @@ export default function HomePage() {
     }
   }, [fetchNotificationCount])
 
-  const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
-  }
+  const showToast = useCallback((message: string) => {
+    setToastInfo(createToastInfo(message))
+  }, [])
 
   const showLoginToast = () => {
     showToast(LOGIN_TOAST_MESSAGE)
@@ -314,13 +319,6 @@ export default function HomePage() {
     navigate('/login')
   }
 
-  useEffect(() => {
-    if (!user) {
-      setDropdownOpen(false)
-      setHasUnreadNotification(false)
-    }
-  }, [user])
-
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -359,7 +357,7 @@ export default function HomePage() {
               </div>
             </button>
             <ProfileDropdown
-              open={dropdownOpen}
+              open={dropdownIsOpen}
               onClose={() => setDropdownOpen(false)}
               anchorRef={profileButtonRef}
               user={user}
