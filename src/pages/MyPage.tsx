@@ -16,7 +16,7 @@ import {
 import { deletePlan, fetchPlans } from '../api/plans'
 import { useAuth, type User } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { resolveImageUrl } from '../utils/image'
+import { resolveImageUrl } from '../utils/image.ts'
 
 const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/
 const LOGIN_HELPER = '아이디는 영문 소문자와 숫자, _ 만 사용이 가능함'
@@ -320,7 +320,10 @@ export default function MyPage() {
     event.target.value = ''
     setProfileImageUploading(true)
     try {
-      const { uploadUrl, key } = await getProfilePresignedUrl(ext, file.type || 'image/jpeg')
+      const { uploadUrl, key } = await getProfilePresignedUrl({
+        fileExtension: ext,
+        contentType: file.type || 'image/jpeg',
+      })
       const response = await fetch(uploadUrl, {
         method: 'PUT',
         body: file,

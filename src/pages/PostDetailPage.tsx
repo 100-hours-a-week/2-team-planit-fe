@@ -9,7 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { resolveImageUrl } from '../utils/image'
+import { resolveImageUrl } from '../utils/image.ts'
 import {
   createComment,
   deleteComment,
