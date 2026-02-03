@@ -232,6 +232,11 @@
   background: #fee500;
 }
 
+.planit-trip .submit.time-locked {
+  background: #d0d0d0;
+  cursor: not-allowed;
+}
+
 .planit-trip .creating {
   min-height: 100vh;
 }
@@ -375,6 +380,32 @@
   gap: 12px;
   text-align: left;
   cursor: pointer;
+}
+
+.planit-trip .activity-readonly {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planit-trip .activity-edit-row {
+  margin-bottom: 8px;
+}
+
+.planit-trip .activity-edit-row:last-child {
+  margin-bottom: 0;
+}
+
+.planit-trip .activity-edit-row input,
+.planit-trip .activity-edit-row select {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 13px;
 }
 
 .planit-trip .activity-card .order {

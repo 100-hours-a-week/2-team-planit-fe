@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import ProfileDropdown from '../components/ProfileDropdown'
 import Toast from '../components/Toast'
 import { getMyPage } from '../api/users'
+import { fetchMyItineraries } from '../api/trips'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import { getImageUrl } from '../utils/image'
@@ -267,6 +268,23 @@ export default function HomePage() {
     showUnsupportedToast()
   }
 
+  const handleMyTrips = async () => {
+    if (!loggedIn) {
+      showLoginToast()
+      return
+    }
+    try {
+      const data = await fetchMyItineraries()
+      if (!data?.itineraries?.length) {
+        showToast('조회할 일정이 없습니다.')
+        return
+      }
+      navigate('/trips/itineraries', { state: { tripData: data } })
+    } catch (error) {
+      showToast('일정 조회에 실패했습니다.')
+    }
+  }
+
   const handleViewAll = () => {
     if (!loggedIn) {
       showLoginToast()
@@ -386,6 +404,9 @@ export default function HomePage() {
             </button>
             <button type="button" className="secondary-btn" onClick={handleTogetherPlan}>
               같이 계획하기
+            </button>
+            <button type="button" className="secondary-btn" onClick={handleMyTrips}>
+              내 여행 보기
             </button>
           </div>
         </section>
