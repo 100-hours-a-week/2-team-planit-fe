@@ -194,7 +194,7 @@ export default function HomePage() {
         setHasUnreadNotification(false)
         return
       }
-      const shouldCancel = isCancelled ?? (() => false)
+    const shouldCancel: () => boolean = isCancelled ?? (() => false)
       try {
         const result = await getMyPage()
         if (!shouldCancel()) {
