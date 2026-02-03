@@ -1,5 +1,8 @@
-## 작업일지
-
+- 2026-02-03: CloudFront 기반 이미지 URL 생성을 `getImageUrl` 유틸로 통일하고 모든 뷰에서 objectKey→CloudFront URL로 매핑하도록 재정비함.
+- 2026-02-03: axios request/response 인터셉터를 정비해 accessToken을 일관 주입하고 401 시 토큰 삭제/로그인 리다이렉트로 인증 흐름을 방어함.
+- 2026-02-03: authStore hydrate에 JWT exp 기반 유효성 검증 추가하고 dropdown state 해제/로그아웃 후 UI를 즉시 비로그인 상태로 만들도록 조정함.
+- 2026-02-03: S3/CloudFront 기반 이미지 배포를 위한 도메인 전환 및 정책/CORS/캐시/프론트 URL 가이드를 설계·문서화함.
+- 2026-02-03: axios request/response 인터셉터를 정비해 accessToken을 일관 주입하고 401 시 토큰 삭제/로그인 리다이렉트로 인증 흐름을 방어함.
 - 2026-02-02: 전체 앱을 웹앱처럼 보이도록 배경/카드/글래스 레이아웃을 도입하고 `main.tsx`에서 `Router`를 `app-shell`/`app-surface`로 감싸 UI를 통일함.
 - 2026-02-02: 게시글 등록/수정 FormData에 `data` JSON Blob을 붙이고 버튼 활성화·커뮤니티 카드 탐색을 기준대로 정리함.
 - 2026-02-02: 댓글 생성 API를 JSON `Content-Type`으로 호출하고 submit handler에 로그를 두어 요청 흐름/토큰 적용을 추적할 수 있도록 정비함.

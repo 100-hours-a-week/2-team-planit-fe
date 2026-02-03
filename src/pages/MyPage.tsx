@@ -13,6 +13,7 @@ import {
 import { deletePlan, fetchPlans } from '../api/plans'
 import { useAuth, type User } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { getImageUrl } from '../utils/image'
 
 const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/
 const LOGIN_HELPER = '아이디는 영문 소문자와 숫자, _ 만 사용이 가능함'
@@ -179,6 +180,12 @@ export default function MyPage() {
 
     return () => {
       cancelled = true
+    }
+  }, [authUser])
+
+  useEffect(() => {
+    if (!authUser) {
+      setDropdownOpen(false)
     }
   }, [authUser])
 
@@ -467,8 +474,9 @@ export default function MyPage() {
     return null
   }
 
+  const resolvedAuthAvatar = getImageUrl(authUser?.profileImageUrl, DEFAULT_AVATAR_URL)
   const hasAvatar = Boolean(avatarPreview) || Boolean(authUser.profileImageUrl)
-  const currentAvatarSrc = avatarPreview ?? authUser.profileImageUrl ?? DEFAULT_AVATAR_URL
+  const currentAvatarSrc = avatarPreview ?? resolvedAuthAvatar
 
   return (
     <main className="page-shell my-page-shell">

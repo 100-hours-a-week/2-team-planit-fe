@@ -3,6 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { getImageUrl } from '../utils/image'
 import { getPosts } from '../api/posts'
 import type { PostListItem, SortParam } from '../api/posts'
 import { useAuth } from '../store'
@@ -347,7 +348,7 @@ export default function PostListPage() {
                   </div>
                   <div className="post-card__author">
                     <img
-                      src={post.authorProfileImageUrl ?? DEFAULT_AVATAR_URL}
+                      src={getImageUrl(post.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
                       alt={`${post.authorNickname} 프로필`}
                     />
                     <div>
