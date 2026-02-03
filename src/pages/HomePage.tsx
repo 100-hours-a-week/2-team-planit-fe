@@ -189,7 +189,7 @@ export default function HomePage() {
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
 
   const fetchNotificationCount = useCallback(
-    async (isCancelled = () => false) => {
+    async (isCancelled: () => boolean = () => false) => {
       if (!loggedIn) {
         setHasUnreadNotification(false)
         return
