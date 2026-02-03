@@ -5,7 +5,7 @@ import Toast from '../components/Toast'
 import { getMyPage } from '../api/users'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { resolveImageUrl } from '../utils/image'
+import { getImageUrl } from '../utils/image'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
 
@@ -182,7 +182,7 @@ export default function HomePage() {
   const profileButtonRef = useRef<HTMLButtonElement>(null)
   const { user, clearAuth } = useAuth()
   const loggedIn = Boolean(user)
-  const profileAvatarSrc = resolveImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
+  const profileAvatarSrc = getImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
@@ -312,6 +312,13 @@ export default function HomePage() {
     setDropdownOpen(false)
     navigate('/login')
   }
+
+  useEffect(() => {
+    if (!user) {
+      setDropdownOpen(false)
+      setHasUnreadNotification(false)
+    }
+  }, [user])
 
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
