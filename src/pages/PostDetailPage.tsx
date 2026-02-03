@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { resolveImageUrl } from '../utils/image'
 import {
   createComment,
   deleteComment,
@@ -295,7 +296,7 @@ export default function PostDetailPage() {
               <div className="post-detail-meta">
                 <div className="post-detail-author">
                   <img
-                    src={detail.author.profileImageUrl ?? DEFAULT_AVATAR_URL}
+                    src={resolveImageUrl(detail.author.profileImageUrl, DEFAULT_AVATAR_URL)}
                     alt={`${detail.author.nickname} 프로필`}
                   />
                   <div>
@@ -336,11 +337,14 @@ export default function PostDetailPage() {
             </header>
             <div className="post-detail-images">
               {detail.images.length > 0 ? (
-                detail.images.map((image) => (
-                  <figure key={image.imageId} onClick={() => setLightboxImage(image.url ?? '')}>
-                    <img src={image.url ?? DEFAULT_AVATAR_URL} alt={`이미지 ${image.imageId}`} />
-                  </figure>
-                ))
+                detail.images.map((image) => {
+                  const imageSrc = resolveImageUrl(image.url, DEFAULT_AVATAR_URL)
+                  return (
+                    <figure key={image.imageId} onClick={() => setLightboxImage(imageSrc)}>
+                      <img src={imageSrc} alt={`이미지 ${image.imageId}`} />
+                    </figure>
+                  )
+                })
               ) : (
                 <div className="post-detail-images--empty" aria-hidden="true" />
               )}
@@ -383,7 +387,7 @@ export default function PostDetailPage() {
                 <article key={comment.commentId} className="comment-card">
                   <div className="comment-author">
                     <img
-                      src={comment.authorProfileImageUrl ?? DEFAULT_AVATAR_URL}
+                      src={resolveImageUrl(comment.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
                       alt={`${comment.authorNickname} 프로필`}
                     />
                     <div>

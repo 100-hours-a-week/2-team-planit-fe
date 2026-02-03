@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import type { User } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { resolveImageUrl } from '../utils/image'
 
 type Props = {
   open: boolean
@@ -55,7 +56,7 @@ export default function ProfileDropdown({
       <div className="profile-dropdown-header">
         <div className="profile-avatar header-avatar">
           <img
-            src={user?.profileImageUrl ?? DEFAULT_AVATAR_URL}
+            src={resolveImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)}
             alt={user?.loginId ? `${user.loginId} 프로필` : 'PlanIt 기본 아바타'}
           />
         </div>
