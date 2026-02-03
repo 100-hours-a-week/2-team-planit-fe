@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createPostForm } from '../api/posts'
+import { createPost, getPostPresignedUrl } from '../api/posts'
 import Toast from '../components/Toast'
 
 const BOARD_DESCRIPTION = '자유게시판에서는 여행과 일정 정보, 경험을 나누는 공간입니다.'
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
+
+function getFileExtension(file: File): string {
+  const name = file.name.toLowerCase()
+  const ext = name.includes('.') ? name.split('.').pop()! : ''
+  return ALLOWED_EXTENSIONS.includes(ext as (typeof ALLOWED_EXTENSIONS)[number]) ? ext : 'jpg'
+}
 
 export default function PostCreatePage() {
   const navigate = useNavigate()
-  const [boardType] = useState('FREE')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [images, setImages] = useState<File[]>([])
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [imageKeys, setImageKeys] = useState<string[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
@@ -28,36 +35,50 @@ export default function PostCreatePage() {
   }, [])
 
   useEffect(() => {
-    const urls = images.map((file) => URL.createObjectURL(file))
+    const urls = imageFiles.map((file) => URL.createObjectURL(file))
     setPreviews(urls)
     return () => {
       urls.forEach((url) => URL.revokeObjectURL(url))
     }
-  }, [images])
+  }, [imageFiles])
 
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
-    if (!files) {
-      return
-    }
-    const selected = Array.from(files)
-    if (images.length + selected.length > 5) {
-      showToast('이미지는 최대 5장까지 업로드 가능합니다.')
-    }
-    const toAdd = selected.slice(0, Math.max(0, 5 - images.length))
-    const validFiles = toAdd.filter((file) => {
+    if (!files) return
+    const selected = Array.from(files).filter((file) => {
       if (file.size > 5 * 1024 * 1024) {
         showToast('이미지 크기는 최대 5MB까지 허용됩니다.')
         return false
       }
       return true
     })
-    setImages((prev) => [...prev, ...validFiles])
+    const toAdd = selected.slice(0, Math.max(0, 5 - imageFiles.length))
+    if (selected.length > toAdd.length) {
+      showToast('이미지는 최대 5장까지 업로드 가능합니다.')
+    }
     event.target.value = ''
+
+    for (const file of toAdd) {
+      try {
+        const ext = getFileExtension(file)
+        const { uploadUrl, key } = await getPostPresignedUrl(ext, file.type || 'image/jpeg')
+        const response = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type || 'image/jpeg' },
+        })
+        if (!response.ok) throw new Error('업로드 실패')
+        setImageFiles((prev) => [...prev, file])
+        setImageKeys((prev) => [...prev, key])
+      } catch {
+        showToast('이미지 업로드에 실패했습니다.')
+      }
+    }
   }
 
   const handleRemoveImage = (index: number) => {
-    setImages((prev) => prev.filter((_, idx) => idx !== index))
+    setImageFiles((prev) => prev.filter((_, idx) => idx !== index))
+    setImageKeys((prev) => prev.filter((_, idx) => idx !== index))
   }
 
   const validate = () => {
@@ -78,26 +99,14 @@ export default function PostCreatePage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!validate()) {
-      return
-    }
-    const form = new FormData()
-    const payload = {
-      boardType,
-      title: title.trim(),
-      content: content.trim(),
-    }
-    form.append(
-      'data',
-      new Blob([JSON.stringify(payload)], {
-        type: 'application/json',
-      }),
-    )
-    images.forEach((file) => form.append('images', file))
-
+    if (!validate()) return
     setIsSubmitting(true)
     try {
-      const result = await createPostForm(form)
+      const result = await createPost({
+        title: title.trim(),
+        content: content.trim(),
+        imageKeys: imageKeys.length > 0 ? imageKeys : undefined,
+      })
       navigate(`/posts/${result.postId}`)
     } catch {
       showToast('게시글 작성에 실패했습니다.')
@@ -108,6 +117,7 @@ export default function PostCreatePage() {
 
   const contentHint = useMemo(() => `${content.length}/2000`, [content.length])
   const isFormValid = Boolean(title.trim() && content.trim())
+  const boardType = 'FREE'
 
   return (
     <main className="post-create-shell">

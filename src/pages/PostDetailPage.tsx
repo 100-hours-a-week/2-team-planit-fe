@@ -336,15 +336,17 @@ export default function PostDetailPage() {
               )}
             </header>
             <div className="post-detail-images">
-              {detail.images.length > 0 ? (
-                detail.images.map((image) => {
-                  const imageSrc = resolveImageUrl(image.url, DEFAULT_AVATAR_URL)
-                  return (
-                    <figure key={image.imageId} onClick={() => setLightboxImage(imageSrc)}>
-                      <img src={imageSrc} alt={`이미지 ${image.imageId}`} />
-                    </figure>
-                  )
-                })
+              {(detail.images?.filter((img) => img.url)?.length ?? 0) > 0 ? (
+                detail.images
+                  .filter((img) => img.url)
+                  .map((image) => {
+                    const imageSrc = resolveImageUrl(image.url, DEFAULT_AVATAR_URL)
+                    return (
+                      <figure key={image.imageId} onClick={() => setLightboxImage(imageSrc)}>
+                        <img src={imageSrc} alt={`이미지 ${image.imageId}`} />
+                      </figure>
+                    )
+                  })
               ) : (
                 <div className="post-detail-images--empty" aria-hidden="true" />
               )}
