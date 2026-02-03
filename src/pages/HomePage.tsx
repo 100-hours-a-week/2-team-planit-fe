@@ -189,18 +189,19 @@ export default function HomePage() {
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
 
   const fetchNotificationCount = useCallback(
-    async (isCancelled: () => boolean = () => false) => {
+    async (isCancelled?: () => boolean) => {
       if (!loggedIn) {
         setHasUnreadNotification(false)
         return
       }
+      const shouldCancel = isCancelled ?? (() => false)
       try {
         const result = await getMyPage()
-        if (!isCancelled()) {
+        if (!shouldCancel()) {
           setHasUnreadNotification(result.notificationCount > 0)
         }
       } catch {
-        if (!isCancelled()) {
+        if (!shouldCancel()) {
           setHasUnreadNotification(false)
         }
       }
@@ -210,7 +211,7 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false
-    fetchNotificationCount(() => cancelled)
+      fetchNotificationCount(() => cancelled)
     return () => {
       cancelled = true
     }
