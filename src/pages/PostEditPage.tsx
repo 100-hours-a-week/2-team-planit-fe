@@ -123,12 +123,22 @@ export default function PostEditPage() {
       try {
         const ext = getFileExtension(file)
         const { uploadUrl, key } = await getPostPresignedUrl(ext, file.type || 'image/jpeg')
-        // Presigned URL은 host만 서명됨. 커스텀 헤더 없이 body만 보내 서명 불일치를 방지.
+        // Presigned URL은 PUT용. redirect를 따르면 브라우저가 GET으로 바꿔 서명 불일치(403)가 난다.
         const response = await fetch(uploadUrl, {
           method: 'PUT',
           body: await file.arrayBuffer(),
+          redirect: 'manual',
         })
-        if (!response.ok) throw new Error('업로드 실패')
+        if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+          const location = response.headers.get('Location') || '(none)'
+          console.error('S3 redirect detected', response.status, location)
+          throw new Error(`S3 리다이렉트 발생. 버킷 리전이 ap-northeast-2인지 확인하세요. Location: ${location}`)
+        }
+        if (!response.ok) {
+          const body = await response.text()
+          console.error('S3 PUT failed', response.status, body)
+          throw new Error(body || '업로드 실패')
+        }
         setNewFiles((prev) => [...prev, file])
         setImageKeys((prev) => [...prev, key])
       } catch {
