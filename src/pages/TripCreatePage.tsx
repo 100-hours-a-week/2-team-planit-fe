@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   createTrip,
   deleteTrip,
-  fetchMyItineraries,
   fetchTripItineraries,
   updateTripDay,
 } from '../api/trips'
@@ -109,6 +108,7 @@ type ActivityDraft = {
 export default function TripCreatePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const params = useParams<{ tripId?: string }>()
   const [title, setTitle] = useState('')
   const [travelCity, setTravelCity] = useState('')
   const [arrivalDate, setArrivalDate] = useState('')
@@ -141,9 +141,19 @@ export default function TripCreatePage() {
   const [placeDraft, setPlaceDraft] = useState('')
   const showWantedPlaceSection = false
 
+  const routeTripId = Number(params.tripId)
+  const stateTripId = Number((location.state as { tripId?: number } | null)?.tripId)
+  const currentTripId = Number.isFinite(routeTripId) && routeTripId > 0
+    ? routeTripId
+    : Number.isFinite(stateTripId) && stateTripId > 0
+      ? stateTripId
+      : null
+
   const applyFetchedTripData = (data: TripData) => {
     setTripData(data)
-    setTripId(typeof data.tripId === 'number' ? data.tripId : null)
+    const nextTripId =
+      typeof data.tripId === 'number' ? data.tripId : Number(data.tripId)
+    setTripId(Number.isFinite(nextTripId) ? nextTripId : null)
     setSelectedDay((prevDay) => {
       const hasPrevDay = Boolean(data.itineraries?.some((item) => item.day === prevDay))
       if (hasPrevDay) return prevDay
@@ -307,11 +317,11 @@ export default function TripCreatePage() {
   }, [location.state])
 
   useEffect(() => {
-    if (location.pathname !== '/trips/itineraries') return
+    if (!currentTripId) return
 
     const fetchMine = async (silent = false) => {
       try {
-        const data = await fetchMyItineraries()
+        const data = await fetchTripItineraries(currentTripId)
         if (data?.itineraries?.length) {
           applyFetchedTripData(data)
         } else if (!silent) {
@@ -320,7 +330,7 @@ export default function TripCreatePage() {
         }
       } catch (error) {
         if (!silent) {
-          console.error('fetchMyItineraries failed', error)
+          console.error('fetchTripItineraries failed', error)
           showToast('일정 조회에 실패했습니다.')
           setPage('form')
         }
@@ -337,7 +347,7 @@ export default function TripCreatePage() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [location.pathname, showEditMode])
+  }, [currentTripId, showEditMode])
 
   useEffect(() => {
     let intervalId: ReturnType<typeof window.setInterval> | null = null
@@ -380,11 +390,6 @@ export default function TripCreatePage() {
     if (!a.startTime || !b.startTime) return 0
     return a.startTime.localeCompare(b.startTime)
   })
-  const typeLabels: Record<string, string> = {
-    Restaurant: '식당',
-    Attraction: '관광지',
-    Route: '이동',
-  }
 
   if (page === 'creating') {
     return (
@@ -427,9 +432,11 @@ export default function TripCreatePage() {
             <div className="day-actions">
               <button
                 className="pill-button"
+                disabled={!currentTripId || tripData?.isOwner === false}
                 onClick={async () => {
+                  if (!currentTripId) return
                   try {
-                    await deleteTrip()
+                    await deleteTrip(currentTripId)
                     showToast('일정이 삭제되었습니다.')
                     navigate('/')
                   } catch (error) {
@@ -442,6 +449,7 @@ export default function TripCreatePage() {
               </button>
               <button
                 className="pill-button"
+                disabled={tripData?.isOwner === false}
                 onClick={async () => {
                   if (!showEditMode) {
                     const drafts: Record<number, ActivityDraft> = {}
@@ -461,6 +469,10 @@ export default function TripCreatePage() {
 
                   if (!Number.isFinite(dayId) || dayId <= 0) {
                     showToast('일정 정보가 없어 수정할 수 없습니다.')
+                    return
+                  }
+                  if (!currentTripId) {
+                    showToast('여행 정보가 없어 수정할 수 없습니다.')
                     return
                   }
 
@@ -516,11 +528,11 @@ export default function TripCreatePage() {
                   }
 
                   try {
-                    await updateTripDay(dayId, updates)
+                    await updateTripDay(currentTripId, dayId, updates)
                     showToast('일정이 수정되었습니다.')
                     setShowEditMode(false)
                     setEditDrafts({})
-                    const latestData = await fetchMyItineraries()
+                    const latestData = await fetchTripItineraries(currentTripId)
                     if (latestData?.itineraries?.length) {
                       applyFetchedTripData(latestData)
                     }
@@ -587,6 +599,7 @@ export default function TripCreatePage() {
                     ? `${activity.cost.toLocaleString()}원`
                     : '-'
               const name = activity.placeName || activity.transport || '이동'
+              const memoText = activity.memo?.trim() || ''
               const draft = activity.activityId ? editDrafts[activity.activityId] : undefined
 
               return (
@@ -679,8 +692,9 @@ export default function TripCreatePage() {
                       >
                         <div className="time">{activity.startTime}</div>
                         <div className="name">{name}</div>
+                        {memoText && <div className="memo">{memoText}</div>}
                         <div className="meta">
-                          <span>{typeLabels[activity.type || ''] || activity.type}</span>
+                          <span />
                           <span>{costLabel}</span>
                         </div>
                       </button>

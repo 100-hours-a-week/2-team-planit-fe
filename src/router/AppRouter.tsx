@@ -18,6 +18,7 @@ export default function AppRouter() {
       <Routes>
         <Route element={<PrivateRoute />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/trips/:tripId/itineraries" element={<TripCreatePage />} />
           <Route path="/posts" element={<PostListPage />} />
           <Route path="/posts/create" element={<PostCreatePage />} />
           <Route path="/posts/:id/edit" element={<PostEditPage />} />
@@ -27,7 +28,7 @@ export default function AppRouter() {
           <Route path="/notifications" element={<NotificationPage />} />
         </Route>
         <Route path="/trips/new" element={<TripCreatePage />} />
-        <Route path="/trips/itineraries" element={<TripCreatePage />} />
+        <Route path="/trips/itineraries" element={<Navigate to="/mypage" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

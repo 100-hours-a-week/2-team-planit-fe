@@ -1,5 +1,10 @@
 import api from './'
 
+type ApiEnvelope<T> = {
+  message?: string
+  data?: T
+}
+
 export type TripActivity = {
   activityId?: number
   startTime?: string
@@ -24,11 +29,20 @@ export type TripData = {
   title?: string
   startDate?: string
   endDate?: string
+  isOwner?: boolean
   itineraries?: TripItinerary[]
 }
 
-type TripApiResponse = {
-  data?: TripData
+export type TripListItem = {
+  tripId: number
+  title: string
+  startDate: string
+  endDate: string
+  travelCity: string
+}
+
+type TripsPayload = {
+  trips: TripListItem[]
 }
 
 export type CreateTripPayload = {
@@ -44,22 +58,22 @@ export type CreateTripPayload = {
 }
 
 export async function createTrip(payload: CreateTripPayload): Promise<TripData> {
-  const response = await api.post<TripApiResponse>('/trips', payload)
+  const response = await api.post<ApiEnvelope<TripData>>('/trips', payload)
   return response.data?.data ?? {}
 }
 
 export async function fetchTripItineraries(tripId: number): Promise<TripData> {
-  const response = await api.get<TripApiResponse>(`/trips/${tripId}/itineraries`)
+  const response = await api.get<ApiEnvelope<TripData>>(`/trips/${tripId}/itineraries`)
   return response.data?.data ?? {}
 }
 
-export async function fetchMyItineraries(): Promise<TripData> {
-  const response = await api.get<TripApiResponse>('/trips/itineraries')
-  return response.data?.data ?? {}
+export async function fetchTrips(): Promise<TripListItem[]> {
+  const response = await api.get<ApiEnvelope<TripsPayload>>('/trips')
+  return response.data?.data?.trips ?? []
 }
 
-export async function deleteTrip(): Promise<void> {
-  await api.delete('/trips')
+export async function deleteTrip(tripId: number): Promise<void> {
+  await api.delete(`/trips/${tripId}`)
 }
 
 export type UpdateTripPlace = {
@@ -72,8 +86,9 @@ export type UpdateTripPlace = {
 }
 
 export async function updateTripDay(
+  tripId: number,
   dayId: number,
   places: UpdateTripPlace[],
 ): Promise<void> {
-  await api.patch('/trips/itineraries/days', { dayId, places })
+  await api.patch('/trips/itineraries/days', { tripId, dayId, places })
 }
