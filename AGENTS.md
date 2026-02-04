@@ -22,6 +22,8 @@
 - 2026-02-02: 알림 읽음 처리에서 POST를 PATCH로 변경하고 전체 읽음 버튼/호출을 제거해 현재 백엔드 스펙에 맞추며 즉시 상태를 업데이트함.
 - 2026-02-02: NotificationPage와 관련 CSS를 추가해 리스트/토스트/상태 UI를 구현하고, cursor 기반 페이징/무한스크롤을 정비함.
 - 2026-02-02: NotificationPage 헤더 및 카드 스타일을 강화해 요구 UX를 충족함.
+- 2026-02-04: 백엔드가 JSON만 받도록 변경된 `/api/posts`에 맞춰 PostCreate/PostEdit가 FormData가 아닌 `imageKeys` 포함 JSON을 보내고 axios baseURL을 env로 분리하여 QA 오류를 해결함.
+- 2026-02-04: POST /api/posts가 JSON만 받는 백엔드에 맞춰 게시글 작성/수정 UI에서 FormData 대신 `createPost`/`updatePost` JSON 요청을 보내고 이미지 필드는 빈 `imageKeys`로 처리함.
 - 2026-02-01: 프론트 게시물 목록/상세/정렬 동작 상태를 검토해 요구사항 충족을 확인함.
 - 2026-02-01: 게시물 수정 UI를 기존 게시글 정보로 초기화한 뒤 FormData로 `updatePostForm`을 호출하고 저장/취소 흐름을 구성함.
 - 2026-02-01: 게시물 작성 UI를 폼/이미지 미리보기/검증/Toast 피드백과 함께 구성하고 multipart `createPostForm` helper를 추가하여 서버에 전달하도록 구현함.
