@@ -6,7 +6,7 @@ import { getMyPage } from '../api/users'
 import { fetchMyItineraries } from '../api/trips'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { getImageUrl } from '../utils/image'
+import { getImageUrl } from '../utils/image.ts'
 import { createToastInfo } from '../utils/toast'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
