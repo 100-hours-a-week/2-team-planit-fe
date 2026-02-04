@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -94,9 +93,10 @@ export default function PostDetailPage() {
         setDetail(response)
         setLikeCount(response.likeCount)
         setLiked(response.likedByRequester)
-        setComments(response.comments ?? [])
+        const safeComments = Array.isArray(response.comments) ? response.comments : []
+        setComments(safeComments)
         setCommentPage(1)
-        setHasMoreComments((response.commentCount ?? 0) > (response.comments?.length ?? 0))
+        setHasMoreComments((response.commentCount ?? 0) > safeComments.length)
       } catch {
         if (!cancelled) {
           setError('게시글을 불러오지 못했습니다.')
@@ -124,7 +124,8 @@ export default function PostDetailPage() {
         page: commentPage,
         size: COMMENT_PAGE_SIZE,
       })
-      setComments((prev) => [...prev, ...response.comments])
+      const incomingComments = Array.isArray(response.comments) ? response.comments : []
+      setComments((prev) => [...prev, ...incomingComments])
       setHasMoreComments(response.hasMore)
       setCommentPage((prev) => prev + 1)
     } catch {
@@ -206,6 +207,7 @@ export default function PostDetailPage() {
       showToast('게시글 정보를 확인할 수 없습니다.')
       return
     }
+    console.log('submit comment', detail.postId, trimmed)
     setCommentSubmitting(true)
     try {
       await createComment(detail.postId, { content: trimmed })
@@ -245,7 +247,15 @@ export default function PostDetailPage() {
     setCommentToDelete(null)
     try {
       await deleteComment(detail.postId, target.commentId)
-      window.location.reload()
+      setComments((prev) => prev.filter((item) => item.commentId !== target.commentId))
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              commentCount: Math.max((prev.commentCount ?? 0) - 1, 0),
+            }
+          : prev,
+      )
     } catch {
       showToast('댓글 삭제에 실패했습니다.')
     }
@@ -255,13 +265,7 @@ export default function PostDetailPage() {
     setLightboxImage(null)
   }
 
-  const headerSubtitle = useMemo(() => {
-    if (!detail) {
-      return ''
-    }
-    return `${detail.boardName} · ${detail.boardDescription}`
-  }, [detail])
-
+  const displayedCommentCount = comments.length
   const isAuthor = detail?.author.authorId === user?.id
 
   return (
@@ -278,8 +282,16 @@ export default function PostDetailPage() {
         <>
           <section className="post-detail-card">
             <header className="post-detail-header">
-              <p className="post-detail-board">{headerSubtitle}</p>
-              <h1>{detail.title}</h1>
+              <p className="post-detail-board">
+                <span className="post-detail-board__name">{detail.boardName}</span>
+                <span className="post-detail-board__description">{detail.boardDescription}</span>
+              </p>
+              <div className="post-detail-title-row">
+                <h1>{detail.title}</h1>
+                <span className="post-detail-title-time" aria-label="작성 시간">
+                  {formatTimeAgo(detail.createdAt)}
+                </span>
+              </div>
               <div className="post-detail-meta">
                 <div className="post-detail-author">
                   <img
@@ -300,7 +312,7 @@ export default function PostDetailPage() {
                   >
                     👍 {likeCount}
                   </button>
-                  <span>💬 {detail.commentCount}</span>
+                  <span>💬 {displayedCommentCount}</span>
                 </div>
               </div>
               {isAuthor && (
@@ -362,7 +374,7 @@ export default function PostDetailPage() {
           </section>
           <section className="post-detail-comments">
             <header>
-              <strong>댓글 ({detail.commentCount})</strong>
+              <strong>댓글 ({displayedCommentCount})</strong>
               <p>최대 20개씩, 오래된 순</p>
             </header>
             <div className="comment-list">

@@ -21,6 +21,9 @@ export type TripItinerary = {
 
 export type TripData = {
   tripId?: number
+  title?: string
+  startDate?: string
+  endDate?: string
   itineraries?: TripItinerary[]
 }
 

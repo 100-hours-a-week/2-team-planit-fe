@@ -141,6 +141,17 @@ export default function TripCreatePage() {
   const [placeDraft, setPlaceDraft] = useState('')
   const showWantedPlaceSection = false
 
+  const applyFetchedTripData = (data: TripData) => {
+    setTripData(data)
+    setTripId(typeof data.tripId === 'number' ? data.tripId : null)
+    setSelectedDay((prevDay) => {
+      const hasPrevDay = Boolean(data.itineraries?.some((item) => item.day === prevDay))
+      if (hasPrevDay) return prevDay
+      return data.itineraries?.[0]?.day || 1
+    })
+    setPage('schedule')
+  }
+
   const tripDays = useMemo(() => calcDays(arrivalDate, departureDate), [arrivalDate, departureDate])
   const minBudget = tripDays ? tripDays * 5 : 5
   const budgetValue = Number.parseInt(budget, 10)
@@ -291,35 +302,41 @@ export default function TripCreatePage() {
   useEffect(() => {
     const stateTripData = (location.state as { tripData?: TripData } | null)?.tripData
     if (stateTripData?.itineraries?.length) {
-      setTripData(stateTripData)
-      setTripId(typeof stateTripData.tripId === 'number' ? stateTripData.tripId : null)
-      setSelectedDay(stateTripData.itineraries[0]?.day || 1)
-      setPage('schedule')
+      applyFetchedTripData(stateTripData)
     }
   }, [location.state])
 
   useEffect(() => {
     if (location.pathname !== '/trips/itineraries') return
-    if (page === 'schedule') return
-    const fetchMine = async () => {
+
+    const fetchMine = async (silent = false) => {
       try {
         const data = await fetchMyItineraries()
         if (data?.itineraries?.length) {
-          setTripData(data)
-          setTripId(typeof data.tripId === 'number' ? data.tripId : null)
-          setSelectedDay(data.itineraries[0]?.day || 1)
-          setPage('schedule')
-        } else {
+          applyFetchedTripData(data)
+        } else if (!silent) {
           showToast('조회할 일정이 없습니다.')
           setPage('form')
         }
       } catch (error) {
-        showToast('일정 조회에 실패했습니다.')
-        setPage('form')
+        if (!silent) {
+          showToast('일정 조회에 실패했습니다.')
+          setPage('form')
+        }
       }
     }
+
     fetchMine()
-  }, [location.pathname, page])
+    const intervalId = window.setInterval(() => {
+      if (!showEditMode) {
+        fetchMine(true)
+      }
+    }, 60000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [location.pathname, showEditMode])
 
   useEffect(() => {
     let intervalId: ReturnType<typeof window.setInterval> | null = null
@@ -350,6 +367,11 @@ export default function TripCreatePage() {
 
   const safeTitle = title.length > 15 ? `${title.slice(0, 15)}...` : title
   const periodLabel = arrivalDate && departureDate ? `${arrivalDate} ~ ${departureDate}` : ''
+  const scheduleTitle = tripData?.title?.trim() || safeTitle || '여행 일정'
+  const schedulePeriod =
+    tripData?.startDate && tripData?.endDate
+      ? `${tripData.startDate} - ${tripData.endDate}`
+      : periodLabel
 
   const dayTabs = tripData?.itineraries ?? []
   const selectedItinerary = dayTabs.find((item) => item.day === selectedDay)
@@ -372,7 +394,7 @@ export default function TripCreatePage() {
               <h1>{safeTitle || '일정 생성중'}</h1>
               {periodLabel && <p>{periodLabel}</p>}
             </div>
-            <button className="pill-button" onClick={() => setPage('form')}>
+            <button className="pill-button" onClick={() => navigate('/')}>
               홈으로
             </button>
           </header>
@@ -398,8 +420,8 @@ export default function TripCreatePage() {
         <div className="page schedule">
           <header className="schedule-header">
             <div className="title-block">
-              <h1>{safeTitle || '여행 일정'}</h1>
-              <p>{periodLabel}</p>
+              <h1>{scheduleTitle}</h1>
+              {schedulePeriod && <p>{schedulePeriod}</p>}
             </div>
             <div className="day-actions">
               <button
@@ -487,6 +509,7 @@ export default function TripCreatePage() {
                   if (updates.length === 0) {
                     showToast('변경된 내용이 없습니다.')
                     setShowEditMode(false)
+                    setEditDrafts({})
                     return
                   }
 
@@ -494,23 +517,11 @@ export default function TripCreatePage() {
                     await updateTripDay(dayId, updates)
                     showToast('일정이 수정되었습니다.')
                     setShowEditMode(false)
-                    setTripData((prev) => {
-                      if (!prev?.itineraries) return prev
-                      const nextItineraries = prev.itineraries.map((item) => {
-                        if (item.day !== selectedDay) return item
-                        const updatedActivities = (item.activities ?? []).map((activity) => {
-                          if (!activity.activityId) return activity
-                          const change = updates.find((entry) => entry.activityId === activity.activityId)
-                          if (!change) return activity
-                          return {
-                            ...activity,
-                            ...change,
-                          }
-                        })
-                        return { ...item, activities: updatedActivities }
-                      })
-                      return { ...prev, itineraries: nextItineraries }
-                    })
+                    setEditDrafts({})
+                    const latestData = await fetchMyItineraries()
+                    if (latestData?.itineraries?.length) {
+                      applyFetchedTripData(latestData)
+                    }
                   } catch (error) {
                     showToast('일정 수정에 실패했습니다.')
                   }
@@ -518,7 +529,7 @@ export default function TripCreatePage() {
               >
                 {showEditMode ? '수정 완료' : '일정 수정'}
               </button>
-              <button className="pill-button" onClick={() => setPage('form')}>
+              <button className="pill-button" onClick={() => navigate('/')}>
                 홈으로
               </button>
             </div>
@@ -609,7 +620,7 @@ export default function TripCreatePage() {
                           <input
                             type="text"
                             placeholder="장소"
-                            value={draft?.placeName ?? ''}
+                            value={draft?.placeName ?? activity.placeName ?? ''}
                             onChange={(event) =>
                               setEditDrafts((prev) => ({
                                 ...prev,
@@ -625,7 +636,7 @@ export default function TripCreatePage() {
                           <input
                             type="text"
                             placeholder="메모"
-                            value={draft?.memo ?? ''}
+                            value={draft?.memo ?? activity.memo ?? ''}
                             onChange={(event) =>
                               setEditDrafts((prev) => ({
                                 ...prev,
@@ -641,7 +652,7 @@ export default function TripCreatePage() {
                           <input
                             type="number"
                             placeholder="비용"
-                            value={draft?.cost ?? ''}
+                            value={draft?.cost ?? (activity.cost != null ? String(activity.cost) : '')}
                             onChange={(event) =>
                               setEditDrafts((prev) => ({
                                 ...prev,
