@@ -148,17 +148,15 @@ export interface PostCreateResponse {
   imageIds: number[]
 }
 
-export async function createPost(payload: CreatePostPayload): Promise<PostCreateResponse> {
-  const response = await api.post<PostCreateResponse>(BASE_PATH, payload)
-  return response.data
-}
-
 export async function createPost(payload: CreatePostPayload & { imageKeys?: string[] }): Promise<PostCreateResponse> {
   const response = await api.post<PostCreateResponse>(BASE_PATH, payload)
   return response.data
 }
 
-export async function updatePost(id: string, payload: UpdatePostPayload & { imageKeys?: string[] }): Promise<PostCreateResponse> {
+export async function updatePost(
+  id: string | number,
+  payload: UpdatePostPayload & { imageKeys?: string[] },
+): Promise<PostCreateResponse> {
   const response = await api.patch<PostCreateResponse>(`${BASE_PATH}/${id}`, payload)
   return response.data
 }
