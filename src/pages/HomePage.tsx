@@ -191,19 +191,18 @@ export default function HomePage() {
   const dropdownIsOpen = Boolean(user) && dropdownOpen
 
   const fetchNotificationCount = useCallback(
-    async (isCancelled?: () => boolean) => {
+    async (isCancelled: () => boolean = () => false) => {
       if (!loggedIn) {
         setHasUnreadNotification(false)
         return
       }
-      const shouldCancel: () => boolean = isCancelled ?? (() => false)
       try {
         const result = await getMyPage()
-        if (!shouldCancel()) {
+        if (!isCancelled()) {
           setHasUnreadNotification(result.notificationCount > 0)
         }
       } catch {
-        if (!shouldCancel()) {
+        if (!isCancelled()) {
           setHasUnreadNotification(false)
         }
       }
