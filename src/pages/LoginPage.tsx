@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import AuthPageHeader from '../components/AuthPageHeader'
 import { login } from '../api/auth'
 import { useAuth } from '../store'
 
@@ -63,8 +64,10 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="page-shell">
-      <div className="form-card">
+    <>
+      <AuthPageHeader ctaLabel="회원가입" ctaRoute="/signup" />
+      <main className="page-shell">
+        <div className="form-card">
         <header className="form-header">
           <h1>Planit 로그인</h1>
           <p className="subtitle">아이디와 비밀번호를 입력하고 나만의 계획을 확인하세요.</p>
@@ -120,7 +123,8 @@ export default function LoginPage() {
             회원가입
           </button>
         </footer>
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   )
 }

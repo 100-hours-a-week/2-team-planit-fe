@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { authStore } from '../store'
 
-const baseURL = 'https://planit-ai.store/api'
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'https://planit-ai.store/api'
 
 const api = axios.create({
   baseURL,
@@ -18,7 +18,9 @@ api.interceptors.request.use(
   (config) => {
     const token = authStore.accessToken
     const headers = config.headers ?? {}
-    if (token) {
+    const isAuthRequest =
+      config.url?.includes('/auth/login') || config.url?.includes('/users/signup')
+    if (token && !isAuthRequest) {
       headers.Authorization = `Bearer ${token}`
     }
     config.headers = headers
