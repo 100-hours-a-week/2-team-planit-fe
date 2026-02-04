@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AxiosError } from 'axios'
 import { signup } from '../api/auth'
-import { checkLoginId, checkNickname, getSignupProfilePresignedUrl } from '../api/users'
+import {
+  checkLoginId,
+  checkNickname,
+  deleteSignupProfileImageByKey,
+  getSignupProfilePresignedUrl,
+} from '../api/users'
 import type { FormEvent } from 'react'
 import AuthPageHeader from '../components/AuthPageHeader'
 
@@ -90,13 +95,21 @@ export default function SignupPage() {
     }
   }
 
-  const clearProfileImage = useCallback(() => {
+  const clearProfileImage = useCallback(async () => {
+    const keyToDelete = profileImageKey
     setProfilePreview((prev) => {
       if (prev) URL.revokeObjectURL(prev)
       return null
     })
     setProfileImageKey(null)
-  }, [])
+    if (keyToDelete) {
+      try {
+        await deleteSignupProfileImageByKey(keyToDelete)
+      } catch {
+        // S3 삭제 실패해도 UI는 이미 초기화됨
+      }
+    }
+  }, [profileImageKey])
 
   useEffect(() => {
     return () => {
@@ -118,6 +131,14 @@ export default function SignupPage() {
       return
     }
     setErrorMessage('')
+    const previousKey = profileImageKey
+    if (previousKey) {
+      try {
+        await deleteSignupProfileImageByKey(previousKey)
+      } catch {
+        // 교체 시 이전 이미지 S3 삭제 실패해도 새 업로드는 진행
+      }
+    }
     setProfileImageUploading(true)
     setProfilePreview((prev) => {
       if (prev) URL.revokeObjectURL(prev)

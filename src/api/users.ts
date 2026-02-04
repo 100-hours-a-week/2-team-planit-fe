@@ -105,6 +105,11 @@ export async function getSignupProfilePresignedUrl(
   return response.data
 }
 
+/** 회원가입 화면에서 이미지 교체/삭제 시 S3 객체 삭제 (비인증). signup/ prefix key만 허용 */
+export async function deleteSignupProfileImageByKey(key: string): Promise<void> {
+  await api.delete('/users/signup/profile-image', { params: { key } })
+}
+
 /** Presigned URL로 S3 업로드 완료 후 프로필 이미지 key 저장 */
 export async function saveProfileImageKey(key: string): Promise<UserProfileResponse> {
   const response = await api.put<UserProfileResponse>('/users/me/profile-image', { key })
