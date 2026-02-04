@@ -4,6 +4,7 @@ import type { AxiosError } from 'axios'
 import { signup } from '../api/auth'
 import { checkLoginId, checkNickname } from '../api/users'
 import type { FormEvent } from 'react'
+import AuthPageHeader from '../components/AuthPageHeader'
 
 const LOGIN_ID_PATTERN = /^[a-z0-9_]{4,20}$/
 const PASSWORD_PATTERN = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/
@@ -139,8 +140,10 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="page-shell">
-      <div className="form-card">
+    <>
+      <AuthPageHeader ctaLabel="로그인" ctaRoute="/login" />
+      <main className="page-shell">
+        <div className="form-card">
         <header className="form-header">
           <h1>Planit 회원가입</h1>
         </header>
@@ -274,5 +277,6 @@ export default function SignupPage() {
         </footer>
       </div>
     </main>
+  </>
   )
 }
