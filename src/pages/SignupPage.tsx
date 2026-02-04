@@ -147,11 +147,15 @@ export default function SignupPage() {
     setProfileImageKey(null)
     try {
       const { uploadUrl, key } = await getSignupProfilePresignedUrl(ext, file.type || 'image/jpeg')
-      // Presigned URL은 host만 서명됨. 커스텀 헤더 없이 body만 보내 서명 불일치를 방지.
       const response = await fetch(uploadUrl, {
         method: 'PUT',
         body: await file.arrayBuffer(),
+        redirect: 'manual',
       })
+      if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+        console.error('S3 redirect detected', response.status, response.headers.get('Location'))
+        throw new Error('S3 리다이렉트 발생. 버킷 리전이 ap-northeast-2인지 확인하세요.')
+      }
       if (!response.ok) throw new Error('업로드 실패')
       setProfileImageKey(key)
       setProfilePreview(URL.createObjectURL(file))
