@@ -33,7 +33,7 @@ const BOARD_POSTS: BoardPost[] = [
     postId: 401,
     boardType: '자유 게시판',
     title: '한라산이 보여준 겨울의 시간표',
-    content: '산행 루트부터 온천, 숙소까지 하루 스케줄을 공유합니다.',
+    content: '산행 루트부터 온천, 숙소까지 하루 스케줄을 공유합니다',
     likeCount: 1280,
     commentCount: 62,
     createdAt: '2026-01-30T09:10:00.000Z',
@@ -272,6 +272,14 @@ export default function HomePage() {
     navigate('/trips/new')
   }
 
+  const handleViewMyPlans = () => {
+    if (!loggedIn) {
+      showLoginToast()
+      return
+    }
+    navigate('/mypage')
+  }
+
   const handleTogetherPlan = () => {
     if (!loggedIn) {
       showLoginToast()
@@ -392,6 +400,9 @@ export default function HomePage() {
             </button>
             <button type="button" className="secondary-btn" onClick={handleTogetherPlan}>
               같이 계획하기
+            </button>
+            <button type="button" className="secondary-btn" onClick={handleViewMyPlans}>
+              내 일정 보기
             </button>
           </div>
         </section>
