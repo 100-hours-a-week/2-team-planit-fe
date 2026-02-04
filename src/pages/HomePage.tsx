@@ -6,7 +6,7 @@ import { getMyPage } from '../api/users'
 import { fetchMyItineraries } from '../api/trips'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { getImageUrl } from '../utils/image'
+import { getImageUrl } from '../utils/image.ts'
 import { createToastInfo } from '../utils/toast'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
@@ -285,7 +285,7 @@ export default function HomePage() {
         return
       }
       navigate('/trips/itineraries', { state: { tripData: data } })
-    } catch (error) {
+    } catch {
       showToast('일정 조회에 실패했습니다.')
     }
   }
@@ -335,13 +335,6 @@ export default function HomePage() {
     setDropdownOpen(false)
     navigate('/login')
   }
-
-  useEffect(() => {
-    if (!user) {
-      setDropdownOpen(false)
-      setHasUnreadNotification(false)
-    }
-  }, [user])
 
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
