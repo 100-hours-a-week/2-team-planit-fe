@@ -31,7 +31,8 @@ export interface PostDetail {
   }
   images: {
     imageId: number
-    url?: string
+    key?: string | null
+    url?: string | null
   }[]
   likeCount: number
   commentCount: number
@@ -70,11 +71,19 @@ export interface CreateCommentPayload {
 export interface CreatePostPayload {
   title: string
   content: string
+  imageKeys?: string[]
 }
 
 export interface UpdatePostPayload {
   title?: string
   content?: string
+  imageKeys?: string[]
+}
+
+export interface PresignedUrlResponse {
+  uploadUrl: string
+  key: string
+  expiresAt: string
 }
 
 const BASE_PATH = '/posts'
@@ -148,17 +157,32 @@ export interface PostCreateResponse {
   imageIds: number[]
 }
 
-export async function createPost(payload: CreatePostPayload & { imageKeys?: string[] }): Promise<PostCreateResponse> {
+export async function getPostPresignedUrl(
+  fileExtension: string,
+  contentType?: string
+): Promise<PresignedUrlResponse> {
+  const response = await api.post<PresignedUrlResponse>(
+    `${BASE_PATH}/images/presigned-url`,
+    { fileExtension, contentType }
+  )
+  return response.data
+}
+
+export async function createPost(payload: CreatePostPayload): Promise<PostCreateResponse> {
   const response = await api.post<PostCreateResponse>(BASE_PATH, payload)
   return response.data
 }
 
-export async function updatePost(
-  id: string | number,
-  payload: UpdatePostPayload & { imageKeys?: string[] },
-): Promise<PostCreateResponse> {
+export async function updatePost(id: string, payload: UpdatePostPayload): Promise<PostCreateResponse> {
   const response = await api.patch<PostCreateResponse>(`${BASE_PATH}/${id}`, payload)
   return response.data
+}
+
+export async function deletePostImage(
+  postId: number,
+  imageId: number
+): Promise<void> {
+  await api.delete(`${BASE_PATH}/${postId}/images/${imageId}`)
 }
 
 export async function deletePost(id: number | string): Promise<void> {

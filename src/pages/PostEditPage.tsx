@@ -1,12 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Toast from '../components/Toast'
-import { getPost, updatePost } from '../api/posts'
+import { getPost, updatePost, getPostPresignedUrl } from '../api/posts'
 import type { PostDetail } from '../api/posts'
 import { useAuth } from '../store'
+import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { resolveImageUrl } from '../utils/image'
 
 const BOARD_DESCRIPTION = '자유게시판에서는 여행과 일정 정보, 경험을 나누는 공간입니다.'
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
+
+function getFileExtension(file: File): string {
+  const name = file.name.toLowerCase()
+  const ext = name.includes('.') ? name.split('.').pop()! : ''
+  return ALLOWED_EXTENSIONS.includes(ext as (typeof ALLOWED_EXTENSIONS)[number]) ? ext : 'jpg'
+}
 
 export default function PostEditPage() {
   const navigate = useNavigate()
@@ -16,7 +25,9 @@ export default function PostEditPage() {
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [imageKeys, setImageKeys] = useState<string[]>([])
+  const [newFiles, setNewFiles] = useState<File[]>([])
+  const [newFilePreviews, setNewFilePreviews] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -25,9 +36,8 @@ export default function PostEditPage() {
 
   const isAuthor = Boolean(detail && user && detail.author.authorId === user.id)
 
-  const toastKeyRef = useRef(0)
   const showToast = (message: string) => {
-    setToastInfo({ message, key: ++toastKeyRef.current })
+    setToastInfo({ message, key: Date.now() })
   }
 
   useEffect(() => {
@@ -54,6 +64,10 @@ export default function PostEditPage() {
         setDetail(response)
         setTitle(response.title)
         setContent(response.content)
+        const keys = (response.images ?? [])
+          .map((img) => img.key)
+          .filter((k): k is string => Boolean(k))
+        setImageKeys(keys)
       } catch {
         if (!cancelled) {
           setError('게시글을 불러오지 못했습니다.')
@@ -70,23 +84,11 @@ export default function PostEditPage() {
     }
   }, [id])
 
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files) {
-      return
-    }
-    const selected = Array.from(files)
-    if (imageFiles.length + selected.length > 5) {
-      showToast('이미지는 최대 5장까지 선택할 수 있습니다.')
-    }
-    const toAdd = selected.slice(0, Math.max(0, 5 - imageFiles.length))
-    setImageFiles((prev) => [...prev, ...toAdd])
-    event.target.value = ''
-  }
-
-  const handleRemoveImage = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, idx) => idx !== index))
-  }
+  useEffect(() => {
+    const urls = newFiles.map((file) => URL.createObjectURL(file))
+    setNewFilePreviews(urls)
+    return () => urls.forEach((url) => URL.revokeObjectURL(url))
+  }, [newFiles])
 
   const validate = () => {
     const nextErrors: typeof errors = {}
@@ -104,6 +106,47 @@ export default function PostEditPage() {
     return Object.keys(nextErrors).length === 0
   }
 
+  const handleImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+    const selected = Array.from(files).filter((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('이미지 크기는 최대 5MB까지 허용됩니다.')
+        return false
+      }
+      return true
+    })
+    const total = imageKeys.length + newFiles.length
+    const toAdd = selected.slice(0, Math.max(0, 5 - total))
+    event.target.value = ''
+    for (const file of toAdd) {
+      try {
+        const ext = getFileExtension(file)
+        const { uploadUrl, key } = await getPostPresignedUrl(ext, file.type || 'image/jpeg')
+        const response = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type || 'image/jpeg' },
+        })
+        if (!response.ok) throw new Error('업로드 실패')
+        setNewFiles((prev) => [...prev, file])
+        setImageKeys((prev) => [...prev, key])
+      } catch {
+        showToast('이미지 업로드에 실패했습니다.')
+      }
+    }
+  }
+
+  const handleRemoveExistingImage = (index: number) => {
+    setImageKeys((prev) => prev.filter((_, idx) => idx !== index))
+  }
+
+  const handleRemoveNewImage = (index: number) => {
+    const existingCount = imageKeys.length - newFiles.length
+    setNewFiles((prev) => prev.filter((_, idx) => idx !== index))
+    setImageKeys((prev) => prev.filter((_, idx) => idx !== existingCount + index))
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!detail) {
@@ -114,18 +157,14 @@ export default function PostEditPage() {
       showToast('게시글 작성자만 수정할 수 있습니다.')
       return
     }
-    if (!validate()) {
-      return
-    }
-    const payload = {
-      boardType: 'FREE',
-      title: title.trim(),
-      content: content.trim(),
-      imageKeys: [],
-    }
+    if (!validate()) return
     setIsSubmitting(true)
     try {
-      const result = await updatePost(detail.postId, payload)
+      const result = await updatePost(String(detail.postId), {
+        title: title.trim(),
+        content: content.trim(),
+        imageKeys: imageKeys.length > 0 ? imageKeys : undefined,
+      })
       navigate(`/posts/${result.postId}`)
     } catch {
       showToast('게시글 수정에 실패했습니다.')
@@ -179,23 +218,37 @@ export default function PostEditPage() {
             {errors.content && <p className="form-error">{errors.content}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="image-upload">이미지 (선택사항 / 추후 업로드 API 적용)</label>
+            <label htmlFor="image-upload">이미지 (최대 5장, 5MB 이하)</label>
             <input id="image-upload" type="file" accept="image/*" multiple onChange={handleImageChange} />
-            {imageFiles.length > 0 && (
+            {((detail.images?.filter((img) => img.key && imageKeys.includes(img.key))?.length ?? 0) > 0 ||
+              newFilePreviews.length > 0) && (
               <div className="image-preview-grid">
-                {imageFiles.map((file, index) => (
-                  <figure key={`${file.name}-${index}`}>
-                    <p>{file.name}</p>
-                    <button type="button" onClick={() => handleRemoveImage(index)}>
+                {detail.images
+                  ?.filter((img) => img.key && imageKeys.includes(img.key))
+                  .map((img, index) => {
+                    const keyIndex = imageKeys.indexOf(img.key!)
+                    return (
+                      <figure key={`existing-${img.imageId}`}>
+                        <img
+                          src={resolveImageUrl(img.url, DEFAULT_AVATAR_URL)}
+                          alt={`기존 이미지 ${index + 1}`}
+                        />
+                        <button type="button" onClick={() => handleRemoveExistingImage(keyIndex)}>
+                          삭제
+                        </button>
+                      </figure>
+                    )
+                  })}
+                {newFilePreviews.map((src, index) => (
+                  <figure key={`new-${index}`}>
+                    <img src={src} alt={`새 이미지 ${index + 1}`} />
+                    <button type="button" onClick={() => handleRemoveNewImage(index)}>
                       삭제
                     </button>
                   </figure>
                 ))}
               </div>
             )}
-            <p className="form-hint">
-              기존 이미지 {detail.images.length}장(교체 불가). 새로운 이미지 업로드는 backend에서 imageKeys API 구현 후 연결하세요.
-            </p>
           </div>
           <div className="form-actions">
             <button type="button" className="secondary-btn" onClick={() => navigate(`/posts/${detail.postId}`)}>
