@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createPost, getPostPresignedUrl } from '../api/posts'
+import { createPost, deletePostImageByKey, getPostPresignedUrl } from '../api/posts'
 import Toast from '../components/Toast'
 
 const BOARD_DESCRIPTION = '자유게시판에서는 여행과 일정 정보, 경험을 나누는 공간입니다.'
@@ -77,8 +77,12 @@ export default function PostCreatePage() {
   }
 
   const handleRemoveImage = (index: number) => {
+    const keyToDelete = imageKeys[index]
     setImageFiles((prev) => prev.filter((_, idx) => idx !== index))
     setImageKeys((prev) => prev.filter((_, idx) => idx !== index))
+    if (keyToDelete) {
+      deletePostImageByKey(keyToDelete).catch(() => {})
+    }
   }
 
   const validate = () => {

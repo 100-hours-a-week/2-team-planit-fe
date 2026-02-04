@@ -18,7 +18,8 @@ export interface SignupRequest {
   password: string
   passwordConfirm: string
   nickname: string
-  profileImageId: null
+  /** Presigned URL로 S3 업로드 완료 후 받은 key (선택) */
+  profileImageKey?: string | null
 }
 
 export interface SignupResponse {

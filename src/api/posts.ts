@@ -185,6 +185,11 @@ export async function deletePostImage(
   await api.delete(`${BASE_PATH}/${postId}/images/${imageId}`)
 }
 
+/** 업로드만 하고 저장하지 않은 이미지 S3 삭제 (작성/수정 중 이미지 제거 시 호출) */
+export async function deletePostImageByKey(key: string): Promise<void> {
+  await api.delete(`${BASE_PATH}/images/by-key`, { params: { key } })
+}
+
 export async function deletePost(id: number | string): Promise<void> {
   await api.delete(`${BASE_PATH}/${id}`)
 }
