@@ -336,6 +336,13 @@ export default function HomePage() {
     navigate('/login')
   }
 
+  useEffect(() => {
+    if (!user) {
+      setDropdownOpen(false)
+      setHasUnreadNotification(false)
+    }
+  }, [user])
+
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
