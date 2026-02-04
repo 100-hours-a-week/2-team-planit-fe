@@ -187,24 +187,25 @@ export default function HomePage() {
   const profileAvatarSrc = getImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
-  const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
+  const [unreadIndicator, setUnreadIndicator] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
   const dropdownIsOpen = Boolean(user) && dropdownOpen
+  const hasUnreadNotification = Boolean(user) && unreadIndicator
 
   const fetchNotificationCount = useCallback(
     async (isCancelled: () => boolean = () => false) => {
       if (!loggedIn) {
-        setHasUnreadNotification(false)
+        setUnreadIndicator(false)
         return
       }
       try {
         const result = await getMyPage()
         if (!isCancelled()) {
-          setHasUnreadNotification(result.notificationCount > 0)
+          setUnreadIndicator(result.notificationCount > 0)
         }
       } catch {
         if (!isCancelled()) {
-          setHasUnreadNotification(false)
+          setUnreadIndicator(false)
         }
       }
     },
@@ -229,7 +230,7 @@ export default function HomePage() {
         fetchNotificationCount()
         return
       }
-      setHasUnreadNotification(detail.count > 0)
+      setUnreadIndicator(detail.count > 0)
     }
     window.addEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
     return () => {
@@ -332,7 +333,7 @@ export default function HomePage() {
 
   const handleLogout = () => {
     clearAuth()
-    setHasUnreadNotification(false)
+    setUnreadIndicator(false)
     setDropdownOpen(false)
     navigate('/login')
   }

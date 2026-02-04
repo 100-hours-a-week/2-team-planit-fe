@@ -314,7 +314,7 @@ export default function TripCreatePage() {
           setPage('form')
         }
       } catch (error) {
-        console.error('fetchMyItineraries', error)
+        console.error('fetchMyItineraries failed', error)
         showToast('일정 조회에 실패했습니다.')
         setPage('form')
       }
@@ -514,7 +514,7 @@ export default function TripCreatePage() {
                       return { ...prev, itineraries: nextItineraries }
                     })
                   } catch (error) {
-                    console.error('updateTripDay failed', error)
+                    console.error('final updateTripDay catch', error)
                     showToast('일정 수정에 실패했습니다.')
                   }
                 }}
