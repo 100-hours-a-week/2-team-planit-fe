@@ -2,6 +2,8 @@
 + 2026-02-04: `/src/api/axios.ts` 요청 인터셉터를 로그인/회원가입은 제외하도록 수정해 `/auth/login`, `/users/signup` 요청에 Authorization 헤더가 붙지 않게 함.
 - 2026-02-04: 로컬 개발 시 `VITE_API_BASE_URL=http://localhost:8080/api`를 `.env.local`에 정의하고 axios가 환경변수를 우선 읽도록 변경해 dev 서버에서 localhost API를 호출하게 함.
 - 2026-02-04: 로그인/회원가입 전용 `AuthPageHeader` 추가하고 상단에 렌더링해 두 페이지에서도 헤더가 나타나도록 조정함.
+- 2026-02-04: 로그인/회원가입 전용 `AuthPageHeader`의 로고 배치·배경·간격·반응형 스타일을 전면 보강해 컬러 콘트라스트와 모바일 경험을 개선함.
+- 2026-02-04: 로그인/회원가입 헤더를 페이지 상단에 폭 100%로 채우고 웹앱형 배경/간격/버튼 배치·모바일 반응성을 정비해 상단 영역을 단단한 헤더처럼 보이게 개선함.
 - 2026-02-04: HomePage/NotificationPage/PostListPage의 lint 오류(impure/set-state-in-effect/useMemo dependencies/no-unsafe-finally)를 각각 순수 함수/지연 실행/의존성 정리를 통해 해결해 `npm run lint`를 통과시키도록 개선함.
 - 2026-02-04: axios 인스턴스 baseURL 충돌을 해소하고 HomePage/TripCreatePage의 unread/로그 처리 루틴을 ESLint 친화적으로 정비해 `npm run lint`를 통과시킴.
 - 2026-02-04: 전체 앱을 Notification/Post*/Trip*/HomePage/AppRouter/CSS를 최신 상태로 맞추고 axios/Notification API/JSON payload 설정 및 ESLint 오류를 정리해 lint를 복구함.
