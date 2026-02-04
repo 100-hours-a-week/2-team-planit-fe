@@ -32,3 +32,5 @@ export function getImageUrl(objectKey?: string | null, fallback?: string) {
   const keyWithoutSlash = stripLeadingSlash(normalizedKey)
   return `${CLOUDFRONT_BASE_URL}/${keyWithoutSlash}`
 }
+
+export const resolveImageUrl = getImageUrl

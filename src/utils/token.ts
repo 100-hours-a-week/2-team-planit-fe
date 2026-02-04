@@ -1,37 +1,41 @@
-const base64UrlDecode = (value: string) => {
-  const padded = value.padEnd(Math.ceil(value.length / 4) * 4, '=')
-  const base64 = padded.replace(/-/g, '+').replace(/_/g, '/')
+type JwtPayload = {
+  exp?: number | null
+}
+
+function decodeJwtPayload(token: string): JwtPayload | null {
+  const [, payload] = token.split('.')
+  if (!payload) {
+    return null
+  }
+
+  const normalized = payload
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    '=',
+  )
+
   try {
-    return decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`)
-        .join(''),
-    )
+    const decoded =
+      typeof globalThis.atob === 'function'
+        ? globalThis.atob(padded)
+        : ''
+    return JSON.parse(decoded) as JwtPayload
   } catch {
-    return ''
+    return null
   }
 }
 
-export function isTokenExpired(token?: string | null) {
+export function isTokenExpired(token: string | null) {
   if (!token) {
     return true
   }
-  const parts = token.split('.')
-  if (parts.length < 2) {
+
+  const payload = decodeJwtPayload(token)
+  if (!payload?.exp) {
     return true
   }
-  const payload = base64UrlDecode(parts[1])
-  if (!payload) {
-    return true
-  }
-  try {
-    const parsed = JSON.parse(payload)
-    if (typeof parsed.exp !== 'number') {
-      return false
-    }
-    return parsed.exp * 1000 <= Date.now()
-  } catch {
-    return true
-  }
+
+  return payload.exp * 1000 <= Date.now()
 }

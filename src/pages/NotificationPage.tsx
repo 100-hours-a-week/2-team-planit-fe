@@ -12,7 +12,6 @@ import type {
   NotificationType,
 } from '../api/notifications'
 import { useAuth } from '../store'
-import { createToastInfo } from '../utils/toast'
 
 const TYPE_LABELS: Record<NotificationType, string> = {
   KEYWORD: '키워드',
@@ -88,7 +87,7 @@ export default function NotificationPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  const safeNotifications = useMemo(() => notifications ?? [], [notifications])
+  const safeNotifications = notifications ?? []
   const unreadCount = useMemo(
     () => safeNotifications.reduce((count, item) => (item.isRead ? count : count + 1), 0),
     [safeNotifications],
@@ -113,9 +112,9 @@ export default function NotificationPage() {
     }
   }, [])
 
-  const showToast = useCallback((message: string) => {
-    setToastInfo(createToastInfo(message))
-  }, [])
+  const showToast = (message: string) => {
+    setToastInfo({ message, key: Date.now() })
+  }
 
   useEffect(() => {
     if (!user) {
@@ -178,14 +177,14 @@ export default function NotificationPage() {
       const result = await getNotifications({ cursor: nextCursor, size: 15 })
       const safeList = normalizeNotificationsFromResponse(result)
       console.debug('notifications page response', result)
-      setNotifications((prev) => [...prev, ...safeList])
+      setNotifications((prev) => [...(prev ?? []), ...safeList])
       setNextCursor(result.nextCursor ?? null)
     } catch {
       showToast('추가 알림을 불러오는 중 오류가 발생했습니다.')
     } finally {
       setLoadingMore(false)
     }
-  }, [accessToken, loadingMore, nextCursor, showToast])
+  }, [loadingMore, nextCursor])
 
   useEffect(() => {
     if (loadingMore || loading || !nextCursor) {
@@ -214,17 +213,17 @@ export default function NotificationPage() {
       setMarkingId(item.notificationId)
       try {
         await markNotificationRead(item.notificationId)
-        setNotifications((prev) =>
-          prev.map((notification) =>
-            notification.notificationId === item.notificationId
-              ? { ...notification, isRead: true }
-              : notification,
-          ),
-        )
-        refreshUnreadBadge()
-      } catch {
-        showToast('알림을 읽음 처리하는 데 실패했습니다.')
-      } finally {
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.notificationId === item.notificationId
+            ? { ...notification, isRead: true }
+            : notification,
+        ),
+      )
+      refreshUnreadBadge()
+    } catch {
+      showToast('알림을 읽음 처리하는 데 실패했습니다.')
+    } finally {
         setMarkingId(null)
       }
     }
@@ -281,7 +280,7 @@ export default function NotificationPage() {
                   <p className="notification-card__timestamp">{formatTimeAgo(notification.createdAt)}</p>
                 </div>
               </div>
-              <p className="notification-card__text">{getNotificationMessage(notification)}</p>
+                  <p className="notification-card__text">{getNotificationMessage(notification)}</p>
               {!notification.isRead && <span className="notification-card__unread-pill">새 알림</span>}
             </article>
           ))}
