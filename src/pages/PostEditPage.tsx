@@ -1,22 +1,52 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Toast from '../components/Toast'
-import { getPost, updatePost } from '../api/posts'
+import { deletePostImageByKey, getPost, getPostPresignedUrl, updatePost } from '../api/posts'
 import type { PostDetail } from '../api/posts'
 import { useAuth } from '../store'
 
 const BOARD_DESCRIPTION = '자유게시판에서는 여행과 일정 정보, 경험을 나누는 공간입니다.'
+const MAX_IMAGES = 5
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
+
+function getFileExtension(file: File): string {
+  const ext = (file.name.split('.').pop() ?? '').toLowerCase().replace(/^\./, '')
+  return ALLOWED_EXTENSIONS.includes(ext) ? ext : 'jpg'
+}
+
+function extractS3ErrorCode(body: string): string | null {
+  const match = body.match(/<Code>([^<]+)<\/Code>/)
+  return match?.[1] ?? null
+}
+
+async function buildUploadFailureMessage(response: Response): Promise<string> {
+  const status = response.status
+  const text = await response.text().catch(() => '')
+  const code = extractS3ErrorCode(text)
+
+  if (status === 403 || code === 'AccessDenied') {
+    return 'S3 업로드 권한이 없습니다. AWS 키/버킷 정책을 확인해주세요.'
+  }
+  if (status === 400 || code === 'SignatureDoesNotMatch') {
+    return 'S3 업로드 서명 검증에 실패했습니다. 업로드 Content-Type이 presigned 발급 값과 같은지 확인해주세요.'
+  }
+  return `이미지 업로드에 실패했습니다. (HTTP ${status})`
+}
+
+type ImageItem = { key: string; previewUrl?: string; url?: string }
 
 export default function PostEditPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [imageItems, setImageItems] = useState<ImageItem[]>([])
+  const [imageUploading, setImageUploading] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -54,6 +84,10 @@ export default function PostEditPage() {
         setDetail(response)
         setTitle(response.title)
         setContent(response.content)
+        const initialImages: ImageItem[] = (response.images ?? [])
+          .filter((img): img is typeof img & { key: string } => Boolean(img.key))
+          .map((img) => ({ key: img.key, url: img.url }))
+        setImageItems(initialImages)
       } catch {
         if (!cancelled) {
           setError('게시글을 불러오지 못했습니다.')
@@ -70,23 +104,94 @@ export default function PostEditPage() {
     }
   }, [id])
 
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files) {
-      return
+  useEffect(() => {
+    return () => {
+      imageItems.forEach((item) => {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+      })
     }
-    const selected = Array.from(files)
-    if (imageFiles.length + selected.length > 5) {
-      showToast('이미지는 최대 5장까지 선택할 수 있습니다.')
-    }
-    const toAdd = selected.slice(0, Math.max(0, 5 - imageFiles.length))
-    setImageFiles((prev) => [...prev, ...toAdd])
-    event.target.value = ''
-  }
+  }, [imageItems])
 
-  const handleRemoveImage = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, idx) => idx !== index))
-  }
+  const imageCountRef = useRef(0)
+  imageCountRef.current = imageItems.length
+
+  const handleImageAdd = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.target
+    const readAndUpload = () => {
+      const files = input.files
+      const currentCount = imageCountRef.current
+      const slot = MAX_IMAGES - currentCount
+      console.log('[PostEdit] 이미지 선택됨', files?.length ?? 0, '개, 현재 이미지:', currentCount, '남은 슬롯:', slot)
+      if (!files?.length) return
+      if (slot <= 0) {
+        showToast('이미지는 최대 5장까지 추가할 수 있습니다.')
+        return
+      }
+      const fileList = Array.from(files).slice(0, slot)
+      input.value = ''
+      setImageUploading(true)
+      const run = async () => {
+        try {
+          const added: ImageItem[] = []
+          const toAdd = fileList
+          for (const file of toAdd) {
+            const fileExtension = getFileExtension(file)
+            const contentType = file.type || 'image/jpeg'
+            console.log('[PostEdit] presigned URL 요청 중...', { fileExtension, contentType })
+            let uploadUrl: string
+            let key: string
+            try {
+              const res = await getPostPresignedUrl(fileExtension, contentType)
+              uploadUrl = res.uploadUrl
+              key = res.key
+              console.log('[PostEdit] presigned URL 받음, S3 PUT 시도 중...')
+            } catch (apiErr: unknown) {
+              const ax = apiErr as { response?: { status?: number; data?: unknown } }
+              console.error('[PostEdit] presigned URL 요청 실패', ax.response?.status, ax.response?.data, apiErr)
+              throw apiErr
+            }
+            const putRes = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: file,
+              headers: { 'Content-Type': contentType },
+            })
+            console.log('[PostEdit] S3 PUT 응답', putRes.status, putRes.ok)
+            if (!putRes.ok) {
+              throw new Error(await buildUploadFailureMessage(putRes))
+            }
+            added.push({ key, previewUrl: URL.createObjectURL(file) })
+          }
+          console.log('[PostEdit] 업로드 완료, 미리보기 추가 개수:', added.length)
+          setImageItems((prev) => [...prev, ...added].slice(0, MAX_IMAGES))
+        } catch (error) {
+          console.error('PostEdit image upload failed', error)
+          const message = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다.'
+          showToast(message)
+        } finally {
+          setImageUploading(false)
+        }
+      }
+      run().catch((err) => {
+        console.error('PostEdit image add unhandled', err)
+        showToast('이미지 추가 중 오류가 발생했습니다.')
+        setImageUploading(false)
+      })
+    }
+    setTimeout(readAndUpload, 0)
+  }, [])
+
+  const handleImageRemove = useCallback((index: number) => {
+    setImageItems((prev) => {
+      const next = [...prev]
+      const removed = next[index]
+      if (removed.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+      next.splice(index, 1)
+      if (removed.key && removed.previewUrl) {
+        deletePostImageByKey(removed.key).catch(() => {})
+      }
+      return next
+    })
+  }, [])
 
   const validate = () => {
     const nextErrors: typeof errors = {}
@@ -121,7 +226,7 @@ export default function PostEditPage() {
       boardType: 'FREE',
       title: title.trim(),
       content: content.trim(),
-      imageKeys: [],
+      imageKeys: imageItems.map((item) => item.key),
     }
     setIsSubmitting(true)
     try {
@@ -179,23 +284,41 @@ export default function PostEditPage() {
             {errors.content && <p className="form-error">{errors.content}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="image-upload">이미지 (선택사항 / 추후 업로드 API 적용)</label>
-            <input id="image-upload" type="file" accept="image/*" multiple onChange={handleImageChange} />
-            {imageFiles.length > 0 && (
-              <div className="image-preview-grid">
-                {imageFiles.map((file, index) => (
-                  <figure key={`${file.name}-${index}`}>
-                    <p>{file.name}</p>
-                    <button type="button" onClick={() => handleRemoveImage(index)}>
-                      삭제
-                    </button>
-                  </figure>
-                ))}
-              </div>
-            )}
-            <p className="form-hint">
-              기존 이미지 {detail.images.length}장(교체 불가). 새로운 이미지 업로드는 backend에서 imageKeys API 구현 후 연결하세요.
-            </p>
+            <label>이미지 (최대 {MAX_IMAGES}장)</label>
+            <p className="helper-text">기존 이미지 유지, 추가 또는 제거할 수 있습니다.</p>
+            <div className="post-create-images">
+              {imageItems.map((item, index) => (
+                <figure key={`${item.key}-${index}`} className="post-create-image-item">
+                  <img
+                    src={item.previewUrl ?? item.url ?? ''}
+                    alt=""
+                  />
+                  <button
+                    type="button"
+                    className="post-create-image-remove"
+                    onClick={() => handleImageRemove(index)}
+                    aria-label="이미지 제거"
+                  >
+                    ×
+                  </button>
+                </figure>
+              ))}
+              {imageItems.length < MAX_IMAGES && (
+                <label className="post-create-image-add">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    disabled={imageUploading}
+                    onChange={handleImageAdd}
+                  />
+                  <span className="secondary-btn small">
+                    {imageUploading ? '업로드 중…' : '+ 이미지 추가'}
+                  </span>
+                </label>
+              )}
+            </div>
           </div>
           <div className="form-actions">
             <button type="button" className="secondary-btn" onClick={() => navigate(`/posts/${detail.postId}`)}>

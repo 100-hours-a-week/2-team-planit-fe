@@ -5,7 +5,10 @@ import Modal from '../components/Modal'
 import Toast from '../components/Toast'
 import {
   checkNickname,
+  deleteProfileImage,
   getMyPage,
+  getProfilePresignedUrl,
+  saveProfileImageKey,
   updateProfile,
   withdrawUser,
   type MyPageResponse,
@@ -76,6 +79,8 @@ export default function MyPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [profileImageLoading, setProfileImageLoading] = useState(false)
+  const [profileImageError, setProfileImageError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
   const [loading, setLoading] = useState(true)
@@ -306,23 +311,83 @@ export default function MyPage() {
     fileInputRef.current?.click()
   }
 
-  const handleProfileImageSelection = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleProfileImageSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) {
+    event.target.value = ''
+    if (!file || !authUser) {
       return
     }
-    const url = URL.createObjectURL(file)
-    setAvatarPreview(url)
-    event.target.value = ''
-  }
+    const ext = (file.name.split('.').pop() ?? '').toLowerCase().replace(/^\./, '') || 'jpg'
+    const allowed = ['jpg', 'jpeg', 'png', 'webp']
+    const fileExtension = allowed.includes(ext) ? ext : 'jpg'
+    const contentType = file.type || 'image/jpeg'
 
-  const handleAvatarReset = () => {
+    setProfileImageError(null)
+    setProfileImageLoading(true)
     if (avatarPreview) {
       URL.revokeObjectURL(avatarPreview)
+      setAvatarPreview(null)
     }
-    setAvatarPreview(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+    try {
+      const { uploadUrl, key } = await getProfilePresignedUrl(fileExtension, contentType)
+      const putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': contentType },
+      })
+      if (!putRes.ok) {
+        throw new Error('이미지 업로드에 실패했습니다.')
+      }
+      const updated = await saveProfileImageKey(key)
+      const nextUser: User = {
+        id: updated.userId,
+        loginId: updated.loginId,
+        nickname: updated.nickname,
+        profileImageUrl: updated.profileImageUrl ?? null,
+      }
+      setAuth({ user: nextUser, accessToken })
+      setPageStats((prev) =>
+        prev ? { ...prev, profileImageUrl: updated.profileImageUrl ?? undefined } : prev,
+      )
+      setToastMessage('*프로필 이미지가 변경되었습니다.')
+    } catch (err) {
+      setProfileImageError(getErrorMessage(err, '*프로필 이미지 업로드에 실패했습니다.'))
+    } finally {
+      setProfileImageLoading(false)
+    }
+  }
+
+  const handleAvatarReset = async () => {
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview)
+      setAvatarPreview(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+    if (!authUser?.profileImageUrl) {
+      return
+    }
+    setProfileImageError(null)
+    setProfileImageLoading(true)
+    try {
+      const updated = await deleteProfileImage()
+      const nextUser: User = {
+        id: updated.userId,
+        loginId: updated.loginId,
+        nickname: updated.nickname,
+        profileImageUrl: updated.profileImageUrl ?? null,
+      }
+      setAuth({ user: nextUser, accessToken })
+      setPageStats((prev) =>
+        prev ? { ...prev, profileImageUrl: undefined } : prev,
+      )
+      setToastMessage('*프로필 이미지가 삭제되었습니다.')
+    } catch (err) {
+      setProfileImageError(getErrorMessage(err, '*프로필 이미지 삭제에 실패했습니다.'))
+    } finally {
+      setProfileImageLoading(false)
     }
   }
 
@@ -611,34 +676,41 @@ export default function MyPage() {
 
         <section className="profile-upload">
           <h2>프로필 이미지</h2>
-          <p className="helper-text">현재 서버에 등록된 이미지를 기반으로 보여줍니다.</p>
+          <p className="helper-text">jpg, png, webp 형식으로 업로드할 수 있습니다.</p>
+          {profileImageError && (
+            <p className="error-text helper-layer-text">{profileImageError}</p>
+          )}
           <div className="avatar-grid">
             <div className="avatar-circle large">
               <img src={currentAvatarSrc} alt={`${authUser.loginId} 프로필`} />
             </div>
             <div className="upload-helpers">
-              <button type="button" className="secondary-btn small" onClick={triggerFilePicker}>
-                이미지 업로드
+              <button
+                type="button"
+                className="secondary-btn small"
+                onClick={triggerFilePicker}
+                disabled={profileImageLoading}
+              >
+                {profileImageLoading ? '처리 중…' : '이미지 업로드'}
               </button>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 ref={fileInputRef}
                 className="avatar-input"
                 hidden
                 onChange={handleProfileImageSelection}
               />
-              {avatarPreview && (
-                <button type="button" className="text-link" onClick={handleAvatarReset}>
+              {(avatarPreview || authUser?.profileImageUrl) && (
+                <button
+                  type="button"
+                  className="text-link"
+                  onClick={handleAvatarReset}
+                  disabled={profileImageLoading}
+                >
                   삭제
                 </button>
               )}
-              {!avatarPreview && !authUser?.profileImageUrl && (
-                <p className="error-text helper-layer-text">*프로필 사진을 추가해주세요.</p>
-              )}
-              <p className="helper-text helper-note">
-                현재 이미지 업로드는 미리보기만 제공되며 서버 반영은 추후 지원 예정입니다.
-              </p>
             </div>
           </div>
         </section>

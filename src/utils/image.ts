@@ -18,11 +18,9 @@ export function getImageUrl(objectKey?: string | null, fallback?: string) {
     return fallback ?? DEFAULT_FALLBACK
   }
 
+  // 백엔드가 이미 CloudFront 등 절대 URL로 내려준 경우 그대로 사용
   if (isAbsoluteUrl(normalizedKey)) {
-    if (import.meta.env.MODE !== 'production') {
-      console.warn('Invalid image src, forcing CloudFront fallback:', normalizedKey)
-    }
-    return fallback ?? DEFAULT_FALLBACK
+    return normalizedKey
   }
 
   if (!CLOUDFRONT_BASE_URL) {
