@@ -65,8 +65,9 @@ export default function PostDetailPage() {
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
 
+  const toastKeyRef = useRef(0)
   const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
+    setToastInfo({ message, key: ++toastKeyRef.current })
   }
 
   useEffect(() => {

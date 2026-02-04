@@ -3,11 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import ProfileDropdown from '../components/ProfileDropdown'
 import Toast from '../components/Toast'
 import { getMyPage } from '../api/users'
-import { fetchMyItineraries } from '../api/trips'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { getImageUrl } from '../utils/image.ts'
-import { createToastInfo } from '../utils/toast'
+import { resolveImageUrl } from '../utils/image.ts'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
 
@@ -184,28 +182,26 @@ export default function HomePage() {
   const profileButtonRef = useRef<HTMLButtonElement>(null)
   const { user, clearAuth } = useAuth()
   const loggedIn = Boolean(user)
-  const profileAvatarSrc = getImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
+  const profileAvatarSrc = resolveImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
-  const [unreadIndicator, setUnreadIndicator] = useState(false)
+  const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
-  const dropdownIsOpen = Boolean(user) && dropdownOpen
-  const hasUnreadNotification = Boolean(user) && unreadIndicator
 
   const fetchNotificationCount = useCallback(
     async (isCancelled: () => boolean = () => false) => {
       if (!loggedIn) {
-        setUnreadIndicator(false)
+        setHasUnreadNotification(false)
         return
       }
       try {
         const result = await getMyPage()
         if (!isCancelled()) {
-          setUnreadIndicator(result.notificationCount > 0)
+          setHasUnreadNotification(result.notificationCount > 0)
         }
       } catch {
         if (!isCancelled()) {
-          setUnreadIndicator(false)
+          setHasUnreadNotification(false)
         }
       }
     },
@@ -214,10 +210,7 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false
-    const run = async () => {
-      await fetchNotificationCount(() => cancelled)
-    }
-    run()
+    fetchNotificationCount(() => cancelled)
     return () => {
       cancelled = true
     }
@@ -230,7 +223,7 @@ export default function HomePage() {
         fetchNotificationCount()
         return
       }
-      setUnreadIndicator(detail.count > 0)
+      setHasUnreadNotification(detail.count > 0)
     }
     window.addEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
     return () => {
@@ -238,9 +231,9 @@ export default function HomePage() {
     }
   }, [fetchNotificationCount])
 
-  const showToast = useCallback((message: string) => {
-    setToastInfo(createToastInfo(message))
-  }, [])
+  const showToast = (message: string) => {
+    setToastInfo({ message, key: Date.now() })
+  }
 
   const showLoginToast = () => {
     showToast(LOGIN_TOAST_MESSAGE)
@@ -272,24 +265,6 @@ export default function HomePage() {
       return
     }
     showUnsupportedToast()
-  }
-
-  const handleMyTrips = async () => {
-    if (!loggedIn) {
-      showLoginToast()
-      return
-    }
-    try {
-      const data = await fetchMyItineraries()
-      if (!data?.itineraries?.length) {
-        showToast('조회할 일정이 없습니다.')
-        return
-      }
-      navigate('/trips/itineraries', { state: { tripData: data } })
-    } catch (error) {
-      console.error('handleMyTrips failed', error)
-      showToast('일정 조회에 실패했습니다.')
-    }
   }
 
   const handleViewAll = () => {
@@ -333,7 +308,7 @@ export default function HomePage() {
 
   const handleLogout = () => {
     clearAuth()
-    setUnreadIndicator(false)
+    setHasUnreadNotification(false)
     setDropdownOpen(false)
     navigate('/login')
   }
@@ -359,7 +334,7 @@ export default function HomePage() {
           <button type="button" className="notification-button" onClick={handleNotificationClick}>
           <span className="sr-only">알림함</span>
           <span aria-hidden="true">🔔</span>
-          {Boolean(user) && hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
+          {hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
           </button>
           <div className="profile-wrapper">
             <button
@@ -376,7 +351,7 @@ export default function HomePage() {
               </div>
             </button>
             <ProfileDropdown
-              open={dropdownIsOpen}
+              open={dropdownOpen}
               onClose={() => setDropdownOpen(false)}
               anchorRef={profileButtonRef}
               user={user}
@@ -404,9 +379,6 @@ export default function HomePage() {
             </button>
             <button type="button" className="secondary-btn" onClick={handleTogetherPlan}>
               같이 계획하기
-            </button>
-            <button type="button" className="secondary-btn" onClick={handleMyTrips}>
-              내 여행 보기
             </button>
           </div>
         </section>
