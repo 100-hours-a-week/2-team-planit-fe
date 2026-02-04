@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Toast from '../components/Toast'
-import { getPost, updatePost, getPostPresignedUrl } from '../api/posts'
+import { deletePostImageByKey, getPost, getPostPresignedUrl, updatePost } from '../api/posts'
 import type { PostDetail } from '../api/posts'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
@@ -143,8 +143,12 @@ export default function PostEditPage() {
 
   const handleRemoveNewImage = (index: number) => {
     const existingCount = imageKeys.length - newFiles.length
+    const keyToDelete = imageKeys[existingCount + index]
     setNewFiles((prev) => prev.filter((_, idx) => idx !== index))
     setImageKeys((prev) => prev.filter((_, idx) => idx !== existingCount + index))
+    if (keyToDelete) {
+      deletePostImageByKey(keyToDelete).catch(() => {})
+    }
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
