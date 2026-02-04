@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { authStore } from '../store'
 
-const baseURL = 'https://planit-ai.store/login'
+const baseURL = 'https://planit-ai.store/login/api'
 
 const api = axios.create({
   baseURL,
