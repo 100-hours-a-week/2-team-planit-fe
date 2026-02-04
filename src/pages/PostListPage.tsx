@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { getImageUrl } from '../utils/image'
+import { resolveImageUrl } from '../utils/image.ts'
 import { getPosts } from '../api/posts'
 import type { PostListItem, SortParam } from '../api/posts'
 import { useAuth } from '../store'
@@ -62,13 +62,12 @@ export default function PostListPage() {
   const [error, setError] = useState('')
   const [searchError, setSearchError] = useState('')
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
-  const toastKeyRef = useRef(0)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const reloadTimeout = useRef<number | null>(null)
   const navigateTimeout = useRef<number | null>(null)
 
   const showToast = (message: string) => {
-    setToastInfo({ message, key: ++toastKeyRef.current })
+    setToastInfo({ message, key: Date.now() })
   }
 
   useEffect(() => {
@@ -119,12 +118,13 @@ export default function PostListPage() {
         }
         setError('게시물을 불러오는 데 실패했습니다.')
       } finally {
-        if (!cancelled) {
-          if (page === 0) {
-            setIsLoading(false)
-          } else {
-            setIsLoadingMore(false)
-          }
+        if (cancelled) {
+          return
+        }
+        if (page === 0) {
+          setIsLoading(false)
+        } else {
+          setIsLoadingMore(false)
         }
       }
     }
@@ -348,7 +348,7 @@ export default function PostListPage() {
                   </div>
                   <div className="post-card__author">
                     <img
-                      src={getImageUrl(post.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
+                      src={resolveImageUrl(post.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
                       alt={`${post.authorNickname} 프로필`}
                     />
                     <div>
