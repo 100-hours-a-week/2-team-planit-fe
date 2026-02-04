@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Toast from '../components/Toast'
 import { getPost, updatePost } from '../api/posts'
@@ -16,6 +16,7 @@ export default function PostEditPage() {
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [imageFiles, setImageFiles] = useState<File[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -24,8 +25,9 @@ export default function PostEditPage() {
 
   const isAuthor = Boolean(detail && user && detail.author.authorId === user.id)
 
+  const toastKeyRef = useRef(0)
   const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
+    setToastInfo({ message, key: ++toastKeyRef.current })
   }
 
   useEffect(() => {
@@ -67,6 +69,24 @@ export default function PostEditPage() {
       cancelled = true
     }
   }, [id])
+
+  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) {
+      return
+    }
+    const selected = Array.from(files)
+    if (imageFiles.length + selected.length > 5) {
+      showToast('이미지는 최대 5장까지 선택할 수 있습니다.')
+    }
+    const toAdd = selected.slice(0, Math.max(0, 5 - imageFiles.length))
+    setImageFiles((prev) => [...prev, ...toAdd])
+    event.target.value = ''
+  }
+
+  const handleRemoveImage = (index: number) => {
+    setImageFiles((prev) => prev.filter((_, idx) => idx !== index))
+  }
 
   const validate = () => {
     const nextErrors: typeof errors = {}
@@ -157,6 +177,25 @@ export default function PostEditPage() {
             />
             <p className="form-hint">{contentHint}</p>
             {errors.content && <p className="form-error">{errors.content}</p>}
+          </div>
+          <div className="form-group">
+            <label htmlFor="image-upload">이미지 (선택사항 / 추후 업로드 API 적용)</label>
+            <input id="image-upload" type="file" accept="image/*" multiple onChange={handleImageChange} />
+            {imageFiles.length > 0 && (
+              <div className="image-preview-grid">
+                {imageFiles.map((file, index) => (
+                  <figure key={`${file.name}-${index}`}>
+                    <p>{file.name}</p>
+                    <button type="button" onClick={() => handleRemoveImage(index)}>
+                      삭제
+                    </button>
+                  </figure>
+                ))}
+              </div>
+            )}
+            <p className="form-hint">
+              기존 이미지 {detail.images.length}장(교체 불가). 새로운 이미지 업로드는 backend에서 imageKeys API 구현 후 연결하세요.
+            </p>
           </div>
           <div className="form-actions">
             <button type="button" className="secondary-btn" onClick={() => navigate(`/posts/${detail.postId}`)}>

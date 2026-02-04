@@ -62,12 +62,13 @@ export default function PostListPage() {
   const [error, setError] = useState('')
   const [searchError, setSearchError] = useState('')
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
+  const toastKeyRef = useRef(0)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const reloadTimeout = useRef<number | null>(null)
   const navigateTimeout = useRef<number | null>(null)
 
   const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
+    setToastInfo({ message, key: ++toastKeyRef.current })
   }
 
   useEffect(() => {
