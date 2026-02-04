@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AxiosError } from 'axios'
 import { signup } from '../api/auth'
-import { checkLoginId, checkNickname } from '../api/users'
+import { checkLoginId, checkNickname, getSignupProfilePresignedUrl } from '../api/users'
 import type { FormEvent } from 'react'
 import AuthPageHeader from '../components/AuthPageHeader'
+
+const ALLOWED_IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'webp']
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 const LOGIN_ID_PATTERN = /^[a-z0-9_]{4,20}$/
 const PASSWORD_PATTERN = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/
@@ -21,6 +24,8 @@ export default function SignupPage() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [nickname, setNickname] = useState('')
   const [profilePreview, setProfilePreview] = useState<string | null>(null)
+  const [profileImageKey, setProfileImageKey] = useState<string | null>(null)
+  const [profileImageUploading, setProfileImageUploading] = useState(false)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -85,13 +90,54 @@ export default function SignupPage() {
     }
   }
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const clearProfileImage = useCallback(() => {
+    setProfilePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    setProfileImageKey(null)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (profilePreview) URL.revokeObjectURL(profilePreview)
+    }
+  }, [profilePreview])
+
+  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0] ?? null
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setProfilePreview(url)
-    } else {
-      setProfilePreview(null)
+    event.currentTarget.value = ''
+    if (!file) return
+    const ext = file.name.toLowerCase().split('.').pop() ?? ''
+    if (!ALLOWED_IMAGE_TYPES.includes(ext)) {
+      setErrorMessage('*jpg, png, webp 형식만 업로드 가능합니다.')
+      return
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setErrorMessage('*이미지 크기는 최대 5MB까지 허용됩니다.')
+      return
+    }
+    setErrorMessage('')
+    setProfileImageUploading(true)
+    setProfilePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    setProfileImageKey(null)
+    try {
+      const { uploadUrl, key } = await getSignupProfilePresignedUrl(ext, file.type || 'image/jpeg')
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'image/jpeg' },
+      })
+      if (!response.ok) throw new Error('업로드 실패')
+      setProfileImageKey(key)
+      setProfilePreview(URL.createObjectURL(file))
+    } catch {
+      setErrorMessage('*프로필 이미지 업로드에 실패했습니다.')
+    } finally {
+      setProfileImageUploading(false)
     }
   }
 
@@ -106,13 +152,13 @@ export default function SignupPage() {
 
     setIsSubmitting(true)
     try {
-    await signup({
-      loginId,
-      password,
-      passwordConfirm,
-      nickname,
-      profileImageId: null,
-    })
+      await signup({
+        loginId,
+        password,
+        passwordConfirm,
+        nickname,
+        profileImageKey: profileImageKey ?? undefined,
+      })
       navigate('/login')
     } catch (error) {
       let remainingErrorMessage = '*회원가입에 실패했습니다.'
@@ -239,7 +285,8 @@ export default function SignupPage() {
                 id="signupProfile"
                 name="signupProfile"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={profileImageUploading}
                 onChange={handleImageChange}
               />
               {profilePreview ? (
@@ -248,17 +295,20 @@ export default function SignupPage() {
                   <button
                     type="button"
                     className="remove-btn"
-                    onClick={() => setProfilePreview(null)}
+                    disabled={profileImageUploading}
+                    onClick={clearProfileImage}
                   >
                     삭제
                   </button>
                 </div>
               ) : (
-                '이미지 업로드'
+                profileImageUploading ? '업로드 중…' : '이미지 업로드'
               )}
             </div>
             <p className="helper-text">
-              {profilePreview ? '이미지가 선택되었습니다.' : '프로필 사진은 선택 사항입니다.'}
+              {profilePreview
+                ? '이미지가 선택되었습니다. 삭제 후 다시 선택하면 변경됩니다.'
+                : '프로필 사진은 선택 사항입니다. (jpg, png, webp, 최대 5MB)'}
             </p>
           </div>
 

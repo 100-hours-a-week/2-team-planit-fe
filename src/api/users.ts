@@ -93,6 +93,18 @@ export async function getProfilePresignedUrl(
   return response.data
 }
 
+/** 회원가입 시 프로필 이미지 Presigned URL 발급 (비인증). 업로드 후 signup 시 profileImageKey로 전달 */
+export async function getSignupProfilePresignedUrl(
+  fileExtension: string,
+  contentType?: string,
+): Promise<PresignedUrlResponse> {
+  const response = await api.post<PresignedUrlResponse>(
+    '/users/signup/profile-image/presigned-url',
+    { fileExtension, contentType: contentType ?? 'image/jpeg' },
+  )
+  return response.data
+}
+
 /** Presigned URL로 S3 업로드 완료 후 프로필 이미지 key 저장 */
 export async function saveProfileImageKey(key: string): Promise<UserProfileResponse> {
   const response = await api.put<UserProfileResponse>('/users/me/profile-image', { key })
