@@ -187,6 +187,7 @@ export default function HomePage() {
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
+  const toastKeyRef = useRef(0)
 
   const fetchNotificationCount = useCallback(
     async (isCancelled: () => boolean = () => false) => {
@@ -209,12 +210,23 @@ export default function HomePage() {
   )
 
   useEffect(() => {
+    if (!loggedIn) {
+      const timer = window.setTimeout(() => {
+        setHasUnreadNotification(false)
+      }, 0)
+      return () => {
+        window.clearTimeout(timer)
+      }
+    }
     let cancelled = false
-    fetchNotificationCount(() => cancelled)
+    const timer = window.setTimeout(() => {
+      fetchNotificationCount(() => cancelled)
+    }, 0)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
-  }, [fetchNotificationCount])
+  }, [fetchNotificationCount, loggedIn])
 
   useEffect(() => {
     const handleUnreadBadgeUpdate = (event: Event) => {
@@ -232,7 +244,8 @@ export default function HomePage() {
   }, [fetchNotificationCount])
 
   const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
+    toastKeyRef.current += 1
+    setToastInfo({ message, key: toastKeyRef.current })
   }
 
   const showLoginToast = () => {
@@ -257,6 +270,14 @@ export default function HomePage() {
       return
     }
     navigate('/trips/new')
+  }
+
+  const handleViewMyPlans = () => {
+    if (!loggedIn) {
+      showLoginToast()
+      return
+    }
+    navigate('/mypage')
   }
 
   const handleTogetherPlan = () => {
@@ -379,6 +400,9 @@ export default function HomePage() {
             </button>
             <button type="button" className="secondary-btn" onClick={handleTogetherPlan}>
               같이 계획하기
+            </button>
+            <button type="button" className="secondary-btn" onClick={handleViewMyPlans}>
+              내 일정 보기
             </button>
           </div>
         </section>
