@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import ProfileDropdown from '../components/ProfileDropdown'
 import Toast from '../components/Toast'
 import { getMyPage } from '../api/users'
-import { fetchMyItineraries } from '../api/trips'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { resolveImageUrl } from '../utils/image.ts'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
 
@@ -182,13 +182,14 @@ export default function HomePage() {
   const profileButtonRef = useRef<HTMLButtonElement>(null)
   const { user, clearAuth } = useAuth()
   const loggedIn = Boolean(user)
+  const profileAvatarSrc = resolveImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
 
   const fetchNotificationCount = useCallback(
-    async (isCancelled = () => false) => {
+    async (isCancelled: () => boolean = () => false) => {
       if (!loggedIn) {
         setHasUnreadNotification(false)
         return
@@ -361,7 +362,7 @@ export default function HomePage() {
             >
               <div className="profile-avatar">
                 <img
-                  src={loggedIn && user?.profileImageUrl ? user.profileImageUrl : DEFAULT_AVATAR_URL}
+                  src={profileAvatarSrc}
                   alt={loggedIn && user ? `${user.loginId} 프로필` : 'PlanIt 기본 아바타'}
                 />
               </div>

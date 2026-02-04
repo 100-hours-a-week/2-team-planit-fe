@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createPostForm } from '../api/posts'
+import { createPost } from '../api/posts'
 import Toast from '../components/Toast'
 
 const BOARD_DESCRIPTION = '자유게시판에서는 여행과 일정 정보, 경험을 나누는 공간입니다.'
@@ -11,14 +11,14 @@ export default function PostCreatePage() {
   const [boardType] = useState('FREE')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [images, setImages] = useState<File[]>([])
-  const [previews, setPreviews] = useState<string[]>([])
+  const [imageFiles, setImageFiles] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
 
+  const toastKeyRef = useRef(0)
   const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
+    setToastInfo({ message, key: ++toastKeyRef.current })
   }
 
   useEffect(() => {
@@ -27,37 +27,22 @@ export default function PostCreatePage() {
     }
   }, [])
 
-  useEffect(() => {
-    const urls = images.map((file) => URL.createObjectURL(file))
-    setPreviews(urls)
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url))
-    }
-  }, [images])
-
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files) {
       return
     }
     const selected = Array.from(files)
-    if (images.length + selected.length > 5) {
-      showToast('이미지는 최대 5장까지 업로드 가능합니다.')
+    if (imageFiles.length + selected.length > 5) {
+      showToast('이미지는 최대 5장까지 선택할 수 있습니다.')
     }
-    const toAdd = selected.slice(0, Math.max(0, 5 - images.length))
-    const validFiles = toAdd.filter((file) => {
-      if (file.size > 5 * 1024 * 1024) {
-        showToast('이미지 크기는 최대 5MB까지 허용됩니다.')
-        return false
-      }
-      return true
-    })
-    setImages((prev) => [...prev, ...validFiles])
+    const toAdd = selected.slice(0, Math.max(0, 5 - imageFiles.length))
+    setImageFiles((prev) => [...prev, ...toAdd])
     event.target.value = ''
   }
 
   const handleRemoveImage = (index: number) => {
-    setImages((prev) => prev.filter((_, idx) => idx !== index))
+    setImageFiles((prev) => prev.filter((_, idx) => idx !== index))
   }
 
   const validate = () => {
@@ -81,23 +66,16 @@ export default function PostCreatePage() {
     if (!validate()) {
       return
     }
-    const form = new FormData()
     const payload = {
       boardType,
       title: title.trim(),
       content: content.trim(),
+      imageKeys: [],
     }
-    form.append(
-      'data',
-      new Blob([JSON.stringify(payload)], {
-        type: 'application/json',
-      }),
-    )
-    images.forEach((file) => form.append('images', file))
 
     setIsSubmitting(true)
     try {
-      const result = await createPostForm(form)
+      const result = await createPost(payload)
       navigate(`/posts/${result.postId}`)
     } catch {
       showToast('게시글 작성에 실패했습니다.')
@@ -148,13 +126,13 @@ export default function PostCreatePage() {
           {errors.content && <p className="form-error">{errors.content}</p>}
         </div>
         <div className="form-group">
-          <label>이미지 (최대 5장, 5MB 이하)</label>
+          <label>이미지 (선택사항 / 추후 업로드 가능)</label>
           <input type="file" accept="image/*" multiple onChange={handleImageChange} />
-          {previews.length > 0 && (
+          {imageFiles.length > 0 && (
             <div className="image-preview-grid">
-              {previews.map((src, index) => (
-                <figure key={`${src}-${index}`}>
-                  <img src={src} alt={`선택한 이미지 ${index + 1}`} />
+              {imageFiles.map((file, index) => (
+                <figure key={`${file.name}-${index}`}>
+                  <p>{file.name}</p>
                   <button type="button" onClick={() => handleRemoveImage(index)}>
                     삭제
                   </button>
@@ -162,6 +140,7 @@ export default function PostCreatePage() {
               ))}
             </div>
           )}
+          <p className="form-hint">이미지 업로드는 서버 이미지 API 준비 시 적용됩니다.</p>
         </div>
         <div className="form-actions">
           <button type="button" className="secondary-btn" onClick={() => navigate('/posts')}>

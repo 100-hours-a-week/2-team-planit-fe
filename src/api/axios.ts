@@ -1,19 +1,28 @@
 import axios from 'axios'
 import { authStore } from '../store'
 
+const baseURL = 'https://planit-ai.store/api'
+      //baseURL: 'http://localhost:8080/api'
+
 const api = axios.create({
-  baseURL: 'https://planit-ai.store/api',
-  //baseURL: 'http://localhost:8080/api',
+  baseURL,
   withCredentials: true,
 })
+
+const redirectToLogin = () => {
+  if (typeof window !== 'undefined') {
+    window.location.assign('/login')
+  }
+}
 
 api.interceptors.request.use(
   (config) => {
     const token = authStore.accessToken
-    config.headers = config.headers ?? {}
+    const headers = config.headers ?? {}
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      headers.Authorization = `Bearer ${token}`
     }
+    config.headers = headers
     return config
   },
   (error) => Promise.reject(error),
@@ -23,8 +32,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status
-    if (status === 401) {
-      // 인증 실패 처리는 호출자(페이지 또는 특정 API)에서 제어합니다.
+    const hasToken = Boolean(authStore.accessToken)
+    if (status === 401 && hasToken) {
+      authStore.clearAuth()
+      redirectToLogin()
     }
     return Promise.reject(error)
   },
