@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { createTrip, fetchTripItineraries } from '../api/trips'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  createTrip,
+  deleteTrip,
+  fetchMyItineraries,
+  fetchTripItineraries,
+  updateTripDay,
+} from '../api/trips'
 import type { TripData } from '../api/trips'
 import './TripCreatePage.css'
 
@@ -49,6 +55,13 @@ const THEMES = [
 ]
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const hour = String(Math.floor(index / 2)).padStart(2, '0')
+  const minutes = index % 2 === 0 ? '00' : '30'
+  return `${hour}:${minutes}`
+})
+const CREATE_ALLOWED_START_HOUR = 14
+const CREATE_ALLOWED_END_HOUR = 2
 
 const formatDisplayDate = (dateStr: string) => {
   if (!dateStr) return ''
@@ -86,8 +99,16 @@ type PlaceItem = {
   name: string
 }
 
+type ActivityDraft = {
+  placeName?: string
+  memo?: string
+  cost?: string
+  startTime?: string
+}
+
 export default function TripCreatePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [title, setTitle] = useState('')
   const [travelCity, setTravelCity] = useState('')
   const [arrivalDate, setArrivalDate] = useState('')
@@ -114,8 +135,11 @@ export default function TripCreatePage() {
   const [showRegenModal, setShowRegenModal] = useState(false)
   const [showEditMode, setShowEditMode] = useState(false)
   const [hasNewChat] = useState(false)
+  const [editDrafts, setEditDrafts] = useState<Record<number, ActivityDraft>>({})
+  const [currentTime, setCurrentTime] = useState(() => new Date())
 
   const [placeDraft, setPlaceDraft] = useState('')
+  const showWantedPlaceSection = false
 
   const tripDays = useMemo(() => calcDays(arrivalDate, departureDate), [arrivalDate, departureDate])
   const minBudget = tripDays ? tripDays * 5 : 5
@@ -134,6 +158,10 @@ export default function TripCreatePage() {
     departureHour !== '' &&
     isBudgetValid &&
     themes.length > 0
+
+  const currentHour = currentTime.getHours()
+  const isCreateWindowOpen =
+    currentHour >= CREATE_ALLOWED_START_HOUR || currentHour < CREATE_ALLOWED_END_HOUR
 
   const isDirty =
     title ||
@@ -165,6 +193,14 @@ export default function TripCreatePage() {
   const showToast = (message: string) => {
     setToast(message)
     window.setTimeout(() => setToast(''), 2500)
+  }
+
+  const handleSubmitClick = () => {
+    if (!isCreateWindowOpen) {
+      showToast('일정생성 가능 시간이 아닙니다.')
+      return
+    }
+    handleSubmit()
   }
 
   const toggleTheme = (theme: string) => {
@@ -248,6 +284,44 @@ export default function TripCreatePage() {
   }
 
   useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 60000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const stateTripData = (location.state as { tripData?: TripData } | null)?.tripData
+    if (stateTripData?.itineraries?.length) {
+      setTripData(stateTripData)
+      setTripId(typeof stateTripData.tripId === 'number' ? stateTripData.tripId : null)
+      setSelectedDay(stateTripData.itineraries[0]?.day || 1)
+      setPage('schedule')
+    }
+  }, [location.state])
+
+  useEffect(() => {
+    if (location.pathname !== '/trips/itineraries') return
+    if (page === 'schedule') return
+    const fetchMine = async () => {
+      try {
+        const data = await fetchMyItineraries()
+        if (data?.itineraries?.length) {
+          setTripData(data)
+          setTripId(typeof data.tripId === 'number' ? data.tripId : null)
+          setSelectedDay(data.itineraries[0]?.day || 1)
+          setPage('schedule')
+        } else {
+          showToast('조회할 일정이 없습니다.')
+          setPage('form')
+        }
+      } catch (error) {
+        showToast('일정 조회에 실패했습니다.')
+        setPage('form')
+      }
+    }
+    fetchMine()
+  }, [location.pathname, page])
+
+  useEffect(() => {
     let intervalId: ReturnType<typeof window.setInterval> | null = null
 
     const fetchTrip = async () => {
@@ -313,6 +387,12 @@ export default function TripCreatePage() {
   }
 
   if (page === 'schedule') {
+    const rawDayId =
+      selectedItinerary?.dayId ??
+      selectedItinerary?.itineraryDayId ??
+      null
+    const dayId = typeof rawDayId === 'number' ? rawDayId : Number(rawDayId)
+
     return (
       <div className="planit-trip">
         <div className="page schedule">
@@ -321,10 +401,129 @@ export default function TripCreatePage() {
               <h1>{safeTitle || '여행 일정'}</h1>
               <p>{periodLabel}</p>
             </div>
-            <button className="pill-button" onClick={() => setPage('form')}>
-              홈으로
-            </button>
+            <div className="day-actions">
+              <button
+                className="pill-button"
+                onClick={async () => {
+                  try {
+                    await deleteTrip()
+                    showToast('일정이 삭제되었습니다.')
+                    navigate('/')
+                  } catch (error) {
+                    showToast('일정 삭제에 실패했습니다.')
+                  }
+                }}
+              >
+                일정 삭제
+              </button>
+              <button
+                className="pill-button"
+                onClick={async () => {
+                  if (!showEditMode) {
+                    const drafts: Record<number, ActivityDraft> = {}
+                    sortedActivities.forEach((activity) => {
+                      if (!activity.activityId) return
+                      drafts[activity.activityId] = {
+                        placeName: activity.placeName ?? '',
+                        memo: activity.memo ?? '',
+                        cost: activity.cost != null ? String(activity.cost) : '',
+                        startTime: activity.startTime ?? '',
+                      }
+                    })
+                    setEditDrafts(drafts)
+                    setShowEditMode(true)
+                    return
+                  }
+
+                  if (!Number.isFinite(dayId) || dayId <= 0) {
+                    showToast('일정 정보가 없어 수정할 수 없습니다.')
+                    return
+                  }
+
+                  const updates = sortedActivities.reduce((acc, activity) => {
+                    if (!activity.activityId) return acc
+                    const draft = editDrafts[activity.activityId]
+                    if (!draft) return acc
+
+                    const trimmedPlace = draft.placeName?.trim()
+                    const trimmedMemo = draft.memo?.trim()
+                    const nextCost =
+                      draft.cost && draft.cost.trim() !== ''
+                        ? Number.parseInt(draft.cost, 10)
+                        : undefined
+
+                    const changes: {
+                      activityId: number
+                      placeName?: string
+                      memo?: string
+                      cost?: number
+                      startTime?: string
+                    } = { activityId: activity.activityId }
+
+                    if (trimmedPlace && trimmedPlace !== (activity.placeName ?? '')) {
+                      changes.placeName = trimmedPlace
+                    }
+                    if (trimmedMemo && trimmedMemo !== (activity.memo ?? '')) {
+                      changes.memo = trimmedMemo
+                    }
+                    if (
+                      typeof nextCost === 'number' &&
+                      Number.isFinite(nextCost) &&
+                      nextCost !== activity.cost
+                    ) {
+                      changes.cost = nextCost
+                    }
+                    if (draft.startTime && draft.startTime !== (activity.startTime ?? '')) {
+                      changes.startTime = draft.startTime
+                    }
+
+                    const keys = Object.keys(changes)
+                    if (keys.length > 1) {
+                      acc.push(changes)
+                    }
+                    return acc
+                  }, [] as { activityId: number; placeName?: string; memo?: string; cost?: number; startTime?: string }[])
+
+                  if (updates.length === 0) {
+                    showToast('변경된 내용이 없습니다.')
+                    setShowEditMode(false)
+                    return
+                  }
+
+                  try {
+                    await updateTripDay(dayId, updates)
+                    showToast('일정이 수정되었습니다.')
+                    setShowEditMode(false)
+                    setTripData((prev) => {
+                      if (!prev?.itineraries) return prev
+                      const nextItineraries = prev.itineraries.map((item) => {
+                        if (item.day !== selectedDay) return item
+                        const updatedActivities = (item.activities ?? []).map((activity) => {
+                          if (!activity.activityId) return activity
+                          const change = updates.find((entry) => entry.activityId === activity.activityId)
+                          if (!change) return activity
+                          return {
+                            ...activity,
+                            ...change,
+                          }
+                        })
+                        return { ...item, activities: updatedActivities }
+                      })
+                      return { ...prev, itineraries: nextItineraries }
+                    })
+                  } catch (error) {
+                    showToast('일정 수정에 실패했습니다.')
+                  }
+                }}
+              >
+                {showEditMode ? '수정 완료' : '일정 수정'}
+              </button>
+              <button className="pill-button" onClick={() => setPage('form')}>
+                홈으로
+              </button>
+            </div>
           </header>
+          {toast && <div className="toast">{toast}</div>}
 
           <div className="tab-row">
             <button className="tab active">일정</button>
@@ -355,10 +554,10 @@ export default function TripCreatePage() {
           <div className="day-header">
             <div className="day-label">Day {selectedDay}</div>
             <div className="day-actions">
-              <button className="pill-button" onClick={() => setShowEditMode(!showEditMode)}>
-                일정 수정
-              </button>
-              <button className="pill-button" onClick={() => setShowRegenModal(true)}>
+              <button
+                className="pill-button"
+                onClick={() => showToast('미지원 기능입니다.')}
+              >
                 일정 재생성
               </button>
             </div>
@@ -374,27 +573,106 @@ export default function TripCreatePage() {
                     ? `${activity.cost.toLocaleString()}원`
                     : '-'
               const name = activity.placeName || activity.transport || '이동'
+              const draft = activity.activityId ? editDrafts[activity.activityId] : undefined
 
               return (
-                <button
+                <div
                   key={activity.activityId || `${activity.startTime}-${index}`}
                   className={`activity-card ${activity.type?.toLowerCase?.() || ''}`}
-                  onClick={() => {
-                    if (activity.googleMapUrl) {
-                      window.open(activity.googleMapUrl, '_blank')
-                    }
-                  }}
                 >
                   <div className="order">{index + 1}</div>
                   <div className="activity-body">
-                    <div className="time">{activity.startTime}</div>
-                    <div className="name">{name}</div>
-                    <div className="meta">
-                      <span>{typeLabels[activity.type || ''] || activity.type}</span>
-                      <span>{costLabel}</span>
-                    </div>
+                    {showEditMode && activity.activityId ? (
+                      <>
+                        <div className="activity-edit-row">
+                          <select
+                            value={draft?.startTime ?? activity.startTime ?? ''}
+                            onChange={(event) =>
+                              setEditDrafts((prev) => ({
+                                ...prev,
+                                [activity.activityId as number]: {
+                                  ...(prev[activity.activityId as number] ?? {}),
+                                  startTime: event.target.value,
+                                },
+                              }))
+                            }
+                          >
+                            <option value="">시간 선택</option>
+                            {TIME_OPTIONS.map((time) => (
+                              <option key={time} value={time}>
+                                {time}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="activity-edit-row">
+                          <input
+                            type="text"
+                            placeholder="장소"
+                            value={draft?.placeName ?? ''}
+                            onChange={(event) =>
+                              setEditDrafts((prev) => ({
+                                ...prev,
+                                [activity.activityId as number]: {
+                                  ...(prev[activity.activityId as number] ?? {}),
+                                  placeName: event.target.value,
+                                },
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="activity-edit-row">
+                          <input
+                            type="text"
+                            placeholder="메모"
+                            value={draft?.memo ?? ''}
+                            onChange={(event) =>
+                              setEditDrafts((prev) => ({
+                                ...prev,
+                                [activity.activityId as number]: {
+                                  ...(prev[activity.activityId as number] ?? {}),
+                                  memo: event.target.value,
+                                },
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="activity-edit-row">
+                          <input
+                            type="number"
+                            placeholder="비용"
+                            value={draft?.cost ?? ''}
+                            onChange={(event) =>
+                              setEditDrafts((prev) => ({
+                                ...prev,
+                                [activity.activityId as number]: {
+                                  ...(prev[activity.activityId as number] ?? {}),
+                                  cost: event.target.value.replace(/\D/g, ''),
+                                },
+                              }))
+                            }
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <button
+                        className="activity-readonly"
+                        onClick={() => {
+                          if (activity.googleMapUrl) {
+                            window.open(activity.googleMapUrl, '_blank')
+                          }
+                        }}
+                      >
+                        <div className="time">{activity.startTime}</div>
+                        <div className="name">{name}</div>
+                        <div className="meta">
+                          <span>{typeLabels[activity.type || ''] || activity.type}</span>
+                          <span>{costLabel}</span>
+                        </div>
+                      </button>
+                    )}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -419,43 +697,15 @@ export default function TripCreatePage() {
             <div className="modal-backdrop" onClick={() => setShowRegenModal(false)}>
               <div className="modal" onClick={(event) => event.stopPropagation()}>
                 <header>
-                  <h3>일정 재생성 테마 선택</h3>
+                  <h3>미지원 기능입니다.</h3>
                   <button className="icon-button" onClick={() => setShowRegenModal(false)}>
                     ✕
                   </button>
                 </header>
-                <div className="theme-grid">
-                  {THEMES.map((theme) => (
-                    <button key={theme} type="button" className="theme-chip">
-                      {theme}
-                    </button>
-                  ))}
-                </div>
-                <footer>
-                  <button className="pill-button">일정 재생성</button>
-                </footer>
               </div>
             </div>
           )}
 
-          {showEditMode && (
-            <div className="modal-backdrop" onClick={() => setShowEditMode(false)}>
-              <div className="modal" onClick={(event) => event.stopPropagation()}>
-                <header>
-                  <h3>일정 수정 (준비중)</h3>
-                  <button className="icon-button" onClick={() => setShowEditMode(false)}>
-                    ✕
-                  </button>
-                </header>
-                <div className="modal-body">
-                  <p>시간/장소/메모/금액 수정 컴포넌트 영역</p>
-                </div>
-                <footer>
-                  <button className="pill-button">수정 완료</button>
-                </footer>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     )
@@ -601,33 +851,39 @@ export default function TripCreatePage() {
           </div>
         </section>
 
-        <section className="section">
-          <label>꼭 가보고 싶은 곳이 있나요?</label>
-          <button className="input-button" onClick={() => setShowPlaceModal(true)}>
-            <span className="placeholder">예: 해운대, 성심당, 디즈니랜드...</span>
-          </button>
-          {wantedPlaces.length > 0 && (
-            <div className="place-list">
-              {wantedPlaces.map((place) => (
-                <div key={place.id} className="place-item">
-                  <span>{place.name}</span>
-                  <button className="remove" onClick={() => handleRemovePlace(place.id)}>
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        {showWantedPlaceSection && (
+          <section className="section">
+            <label>꼭 가보고 싶은 곳이 있나요?</label>
+            <button className="input-button" onClick={() => setShowPlaceModal(true)}>
+              <span className="placeholder">예: 해운대, 성심당, 디즈니랜드...</span>
+            </button>
+            {wantedPlaces.length > 0 && (
+              <div className="place-list">
+                {wantedPlaces.map((place) => (
+                  <div key={place.id} className="place-item">
+                    <span>{place.name}</span>
+                    <button className="remove" onClick={() => handleRemovePlace(place.id)}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="section">
           <button
-            className="submit"
-            onClick={handleSubmit}
+            className={`submit ${!isCreateWindowOpen ? 'time-locked' : ''}`}
+            onClick={handleSubmitClick}
             disabled={!requiredReady || submitState.loading}
+            aria-disabled={!requiredReady || submitState.loading || !isCreateWindowOpen}
           >
             입력 완료 &amp; 대기방 입장 →
           </button>
+          {!isCreateWindowOpen && (
+            <div className="helper warning">※ 일정 생성은 14:00~02:00에만 가능합니다.</div>
+          )}
           {!requiredReady && <div className="helper warning">※ 필수 입력 항목(*)을 모두 입력해주세요.</div>}
           {submitState.error && <div className="helper warning">{submitState.error}</div>}
         </section>
@@ -691,7 +947,7 @@ export default function TripCreatePage() {
           </div>
         )}
 
-        {showPlaceModal && (
+        {showWantedPlaceSection && showPlaceModal && (
           <div className="modal-backdrop" onClick={() => setShowPlaceModal(false)}>
             <div className="modal" onClick={(event) => event.stopPropagation()}>
               <header>
