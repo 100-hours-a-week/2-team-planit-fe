@@ -321,10 +321,10 @@ export default function MyPage() {
     setProfileImageUploading(true)
     try {
       const { uploadUrl, key } = await getProfilePresignedUrl(ext, file.type || 'image/jpeg')
+      // Presigned URL은 host만 서명됨. 커스텀 헤더 없이 body만 보내 서명 불일치를 방지.
       const response = await fetch(uploadUrl, {
         method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type || 'image/jpeg' },
+        body: await file.arrayBuffer(),
       })
       if (!response.ok) throw new Error('업로드 실패')
       const updated = await saveProfileImageKey(key)
