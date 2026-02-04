@@ -1,4 +1,5 @@
 - 2026-02-03: `fetchNotificationCount`/ProfileDropdown 드롭다운/NotificationPage의 toast 로직을 리워크해 `Date.now()` 생성 로직을 공통 `createToastInfo`로 뽑고 ESLint 오류(impure/set-state-in-effect/exhaustive-deps 등)를 정리함.
+- 2026-02-03: `useEffect` 내부 `setState` 호출 제거, TripCreatePage `catch` 블록 변수 정리 등으로 `npm run lint`를 다시 통과시키는 eslint 파일 정비를 완료함.
 - 2026-02-03: PostListPage의 `finally` 블록에서 `return`을 제거해 `no-unsafe-finally` 오류를 해소하고 LIN트가 통과하도록 재정비함.
 - 2026-02-03: eslint 경고/에러를 모두 해결하여 `npm run lint`가 다시 통과하도록 정비함.
 - 2026-02-03: S3/CloudFront 기반 이미지 배포를 위한 도메인 전환 및 정책/CORS/캐시/프론트 URL 가이드를 설계·문서화함.

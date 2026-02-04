@@ -313,7 +313,7 @@ export default function TripCreatePage() {
           showToast('조회할 일정이 없습니다.')
           setPage('form')
         }
-      } catch (error) {
+      } catch {
         showToast('일정 조회에 실패했습니다.')
         setPage('form')
       }
@@ -409,7 +409,7 @@ export default function TripCreatePage() {
                     await deleteTrip()
                     showToast('일정이 삭제되었습니다.')
                     navigate('/')
-                  } catch (error) {
+                  } catch {
                     showToast('일정 삭제에 실패했습니다.')
                   }
                 }}
@@ -511,7 +511,7 @@ export default function TripCreatePage() {
                       })
                       return { ...prev, itineraries: nextItineraries }
                     })
-                  } catch (error) {
+                  } catch {
                     showToast('일정 수정에 실패했습니다.')
                   }
                 }}

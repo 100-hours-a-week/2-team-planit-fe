@@ -285,7 +285,7 @@ export default function HomePage() {
         return
       }
       navigate('/trips/itineraries', { state: { tripData: data } })
-    } catch (error) {
+    } catch {
       showToast('일정 조회에 실패했습니다.')
     }
   }
@@ -335,13 +335,6 @@ export default function HomePage() {
     setDropdownOpen(false)
     navigate('/login')
   }
-
-  useEffect(() => {
-    if (!user) {
-      setDropdownOpen(false)
-      setHasUnreadNotification(false)
-    }
-  }, [user])
 
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
