@@ -7,6 +7,7 @@ import { fetchMyItineraries } from '../api/trips'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import { getImageUrl } from '../utils/image'
+import { createToastInfo } from '../utils/toast'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
 
@@ -188,9 +189,10 @@ export default function HomePage() {
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
+  const dropdownIsOpen = Boolean(user) && dropdownOpen
 
   const fetchNotificationCount = useCallback(
-    async (isCancelled = () => false) => {
+    async (isCancelled: () => boolean = () => false) => {
       if (!loggedIn) {
         setHasUnreadNotification(false)
         return
@@ -211,7 +213,10 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false
-    fetchNotificationCount(() => cancelled)
+    const run = async () => {
+      await fetchNotificationCount(() => cancelled)
+    }
+    run()
     return () => {
       cancelled = true
     }
@@ -232,9 +237,9 @@ export default function HomePage() {
     }
   }, [fetchNotificationCount])
 
-  const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
-  }
+  const showToast = useCallback((message: string) => {
+    setToastInfo(createToastInfo(message))
+  }, [])
 
   const showLoginToast = () => {
     showToast(LOGIN_TOAST_MESSAGE)
@@ -376,7 +381,7 @@ export default function HomePage() {
               </div>
             </button>
             <ProfileDropdown
-              open={dropdownOpen}
+              open={dropdownIsOpen}
               onClose={() => setDropdownOpen(false)}
               anchorRef={profileButtonRef}
               user={user}

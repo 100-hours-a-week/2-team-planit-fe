@@ -12,6 +12,7 @@ import type {
   NotificationType,
 } from '../api/notifications'
 import { useAuth } from '../store'
+import { createToastInfo } from '../utils/toast'
 
 const TYPE_LABELS: Record<NotificationType, string> = {
   KEYWORD: '키워드',
@@ -87,7 +88,7 @@ export default function NotificationPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  const safeNotifications = notifications ?? []
+  const safeNotifications = useMemo(() => notifications ?? [], [notifications])
   const unreadCount = useMemo(
     () => safeNotifications.reduce((count, item) => (item.isRead ? count : count + 1), 0),
     [safeNotifications],
@@ -112,9 +113,9 @@ export default function NotificationPage() {
     }
   }, [])
 
-  const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
-  }
+  const showToast = useCallback((message: string) => {
+    setToastInfo(createToastInfo(message))
+  }, [])
 
   useEffect(() => {
     if (!user) {
@@ -184,7 +185,7 @@ export default function NotificationPage() {
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, nextCursor])
+  }, [accessToken, loadingMore, nextCursor, showToast])
 
   useEffect(() => {
     if (loadingMore || loading || !nextCursor) {
