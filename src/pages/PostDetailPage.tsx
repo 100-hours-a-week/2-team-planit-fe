@@ -142,7 +142,7 @@ export default function PostDetailPage() {
     }
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0]?.isIntersecting) {
           loadMoreComments()
         }
       },
@@ -208,11 +208,22 @@ export default function PostDetailPage() {
       showToast('게시글 정보를 확인할 수 없습니다.')
       return
     }
-    console.log('submit comment', detail.postId, trimmed)
     setCommentSubmitting(true)
     try {
-      await createComment(detail.postId, { content: trimmed })
-      window.location.reload()
+      const created = await createComment(detail.postId, { content: trimmed })
+      setComments((prev) => [created, ...prev])
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              commentCount: Math.max((prev.commentCount ?? 0) + 1, 0),
+            }
+          : prev,
+      )
+      setNewComment('')
+      if (commentInputRef.current) {
+        commentInputRef.current.style.height = 'auto'
+      }
     } catch {
       showToast('댓글 등록에 실패했습니다.')
     } finally {
@@ -295,10 +306,10 @@ export default function PostDetailPage() {
               </div>
               <div className="post-detail-meta">
                 <div className="post-detail-author">
-                    <img
-                      src={getImageUrl(detail.author.profileImageUrl, DEFAULT_AVATAR_URL)}
-                      alt={`${detail.author.nickname} 프로필`}
-                    />
+                  <img
+                    src={getImageUrl(detail.author.profileImageUrl, DEFAULT_AVATAR_URL)}
+                    alt={`${detail.author.nickname} 프로필`}
+                  />
                   <div>
                     <strong>{detail.author.nickname}</strong>
                     <span>{formatTimeAgo(detail.createdAt)}</span>

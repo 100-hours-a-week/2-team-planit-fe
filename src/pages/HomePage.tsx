@@ -359,7 +359,7 @@ export default function HomePage() {
           <button type="button" className="notification-button" onClick={handleNotificationClick}>
           <span className="sr-only">알림함</span>
           <span aria-hidden="true">🔔</span>
-          {hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
+          {Boolean(user) && hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
           </button>
           <div className="profile-wrapper">
             <button
