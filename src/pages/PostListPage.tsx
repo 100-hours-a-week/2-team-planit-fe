@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { getImageUrl } from '../utils/image'
 import { getPosts } from '../api/posts'
 import type { PostListItem, SortParam } from '../api/posts'
 import { useAuth } from '../store'
@@ -47,6 +48,7 @@ type BoardType = (typeof BOARD_TYPES)[number]
 
 export default function PostListPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [boardType, setBoardType] = useState<BoardType>(BOARD_TYPES[0])
@@ -84,7 +86,7 @@ export default function PostListPage() {
     setHasMore(false)
     setError('')
     setPage(0)
-  }, [boardType, sortOption, searchQuery])
+  }, [boardType, sortOption, searchQuery, location.key])
 
   useEffect(() => {
     let cancelled = false
@@ -116,13 +118,12 @@ export default function PostListPage() {
         }
         setError('게시물을 불러오는 데 실패했습니다.')
       } finally {
-        if (cancelled) {
-          return
-        }
-        if (page === 0) {
-          setIsLoading(false)
-        } else {
-          setIsLoadingMore(false)
+        if (!cancelled) {
+          if (page === 0) {
+            setIsLoading(false)
+          } else {
+            setIsLoadingMore(false)
+          }
         }
       }
     }
@@ -131,7 +132,7 @@ export default function PostListPage() {
     return () => {
       cancelled = true
     }
-  }, [boardType, sortOption, searchQuery, page])
+  }, [boardType, sortOption, searchQuery, page, location.key])
 
   useEffect(() => {
     if (!hasMore || isLoading || isLoadingMore) {
@@ -346,7 +347,7 @@ export default function PostListPage() {
                   </div>
                   <div className="post-card__author">
                     <img
-                      src={post.authorProfileImageUrl ?? DEFAULT_AVATAR_URL}
+                      src={getImageUrl(post.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
                       alt={`${post.authorNickname} 프로필`}
                     />
                     <div>

@@ -114,8 +114,15 @@ export async function getPostComments(
   return response.data
 }
 
-export async function createComment(postId: number, payload: CreateCommentPayload): Promise<CommentItem> {
-  const response = await api.post<CommentItem>(`${BASE_PATH}/${postId}/comments`, payload)
+export async function createComment(
+  postId: number,
+  payload: CreateCommentPayload,
+): Promise<CommentItem> {
+  const response = await api.post<CommentItem>(`${BASE_PATH}/${postId}/comments`, payload, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
   return response.data
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ProfileDropdown from '../components/ProfileDropdown'
 import Toast from '../components/Toast'
@@ -6,6 +6,8 @@ import { getMyPage } from '../api/users'
 import { fetchMyItineraries } from '../api/trips'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { getImageUrl } from '../utils/image'
+import { createToastInfo } from '../utils/toast'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
 
@@ -182,36 +184,62 @@ export default function HomePage() {
   const profileButtonRef = useRef<HTMLButtonElement>(null)
   const { user, clearAuth } = useAuth()
   const loggedIn = Boolean(user)
+  const profileAvatarSrc = getImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
-  const [notificationCount, setNotificationCount] = useState(0)
+  const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
+  const dropdownIsOpen = Boolean(user) && dropdownOpen
+
+  const fetchNotificationCount = useCallback(
+    async (isCancelled: () => boolean = () => false) => {
+      if (!loggedIn) {
+        setHasUnreadNotification(false)
+        return
+      }
+      try {
+        const result = await getMyPage()
+        if (!isCancelled()) {
+          setHasUnreadNotification(result.notificationCount > 0)
+        }
+      } catch {
+        if (!isCancelled()) {
+          setHasUnreadNotification(false)
+        }
+      }
+    },
+    [loggedIn],
+  )
 
   useEffect(() => {
     let cancelled = false
-    if (!loggedIn) {
-      setNotificationCount(0)
-      return undefined
+    const run = async () => {
+      await fetchNotificationCount(() => cancelled)
     }
-    getMyPage()
-      .then((result) => {
-        if (!cancelled) {
-          setNotificationCount(result.notificationCount)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setNotificationCount(0)
-        }
-      })
+    run()
     return () => {
       cancelled = true
     }
-  }, [loggedIn])
+  }, [fetchNotificationCount])
 
-  const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
-  }
+  useEffect(() => {
+    const handleUnreadBadgeUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ count: number }> | undefined)?.detail
+      if (detail === undefined) {
+        fetchNotificationCount()
+        return
+      }
+      setHasUnreadNotification(detail.count > 0)
+    }
+    window.addEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
+    return () => {
+      window.removeEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
+    }
+  }, [fetchNotificationCount])
+
+  const showToast = useCallback((message: string) => {
+    setToastInfo(createToastInfo(message))
+  }, [])
 
   const showLoginToast = () => {
     showToast(LOGIN_TOAST_MESSAGE)
@@ -303,10 +331,17 @@ export default function HomePage() {
 
   const handleLogout = () => {
     clearAuth()
-    setNotificationCount(0)
+    setHasUnreadNotification(false)
     setDropdownOpen(false)
     navigate('/login')
   }
+
+  useEffect(() => {
+    if (!user) {
+      setDropdownOpen(false)
+      setHasUnreadNotification(false)
+    }
+  }, [user])
 
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
@@ -327,11 +362,9 @@ export default function HomePage() {
         </h1>
         <div className="header-actions">
           <button type="button" className="notification-button" onClick={handleNotificationClick}>
-            <span className="sr-only">알림함</span>
-            <span aria-hidden="true">🔔</span>
-            {notificationCount > 0 && (
-              <span className="notification-badge">{notificationCount > 99 ? '99+' : notificationCount}</span>
-            )}
+          <span className="sr-only">알림함</span>
+          <span aria-hidden="true">🔔</span>
+          {hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
           </button>
           <div className="profile-wrapper">
             <button
@@ -342,13 +375,13 @@ export default function HomePage() {
             >
               <div className="profile-avatar">
                 <img
-                  src={loggedIn && user?.profileImageUrl ? user.profileImageUrl : DEFAULT_AVATAR_URL}
+                  src={profileAvatarSrc}
                   alt={loggedIn && user ? `${user.loginId} 프로필` : 'PlanIt 기본 아바타'}
                 />
               </div>
             </button>
             <ProfileDropdown
-              open={dropdownOpen}
+              open={dropdownIsOpen}
               onClose={() => setDropdownOpen(false)}
               anchorRef={profileButtonRef}
               user={user}

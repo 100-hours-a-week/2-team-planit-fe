@@ -1,7 +1,18 @@
-## 작업일지
-
+- 2026-02-03: `fetchNotificationCount`/ProfileDropdown 드롭다운/NotificationPage의 toast 로직을 리워크해 `Date.now()` 생성 로직을 공통 `createToastInfo`로 뽑고 ESLint 오류(impure/set-state-in-effect/exhaustive-deps 등)를 정리함.
+- 2026-02-03: PostListPage의 `finally` 블록에서 `return`을 제거해 `no-unsafe-finally` 오류를 해소하고 LIN트가 통과하도록 재정비함.
+- 2026-02-03: eslint 경고/에러를 모두 해결하여 `npm run lint`가 다시 통과하도록 정비함.
+- 2026-02-03: S3/CloudFront 기반 이미지 배포를 위한 도메인 전환 및 정책/CORS/캐시/프론트 URL 가이드를 설계·문서화함.
+- 2026-02-03: axios request/response 인터셉터를 정비해 accessToken을 일관 주입하고 401 시 토큰 삭제/로그인 리다이렉트로 인증 흐름을 방어함.
 - 2026-02-02: 전체 앱을 웹앱처럼 보이도록 배경/카드/글래스 레이아웃을 도입하고 `main.tsx`에서 `Router`를 `app-shell`/`app-surface`로 감싸 UI를 통일함.
-- 2026-02-02: 게시글 등록/수정 FormData에 `data` JSON Blob을 붙이고 홈 커뮤니티 카드의 탐색은 숫자 `postId`를 사용해 `/api/posts/{id}`로 호출되도록 정비함.
+- 2026-02-02: 게시글 등록/수정 FormData에 `data` JSON Blob을 붙이고 버튼 활성화·커뮤니티 카드 탐색을 기준대로 정리함.
+- 2026-02-02: 댓글 생성 API를 JSON `Content-Type`으로 호출하고 submit handler에 로그를 두어 요청 흐름/토큰 적용을 추적할 수 있도록 정비함.
+- 2026-02-02: 게시글 상세 헤더/시간/이미지/댓글/좋아요 영역을 UI 명세(게시판 설명, 작성 시간, 이미지 확대/제한, 댓글 리스트/삭제 흐름)와 맞춰 리팩터링함.
+- 2026-02-02: 댓글 리스트 상태를 항상 배열로 안전하게 관리하고 삭제 시 전체 새로고침 대신 state에서 해당 comment만 제거하며 commentCount도 갱신하도록 방어 코드를 추가함.
+- 2026-02-02: 댓글 수 표기를 `comments.length` 기반으로 바꿔 삭제 시 카운트가 목록과 항상 일치하도록 동기화함.
+- 2026-02-02: `PostListPage`가 location key에 따라 state를 초기화하고 다시 fetch해, 댓글 작성/삭제 후 단순 navigation으로 진입해도 서버 데이터를 기준으로 항상 렌더링하도록 보장함.
+- 2026-02-02: 알림 API 응답이 빈 배열이나 다른 필드명을 써도 에러 없이 처리하도록 guard를 추가하고, 로딩/에러 상태를 분리해 UI가 죽지 않도록 방어함.
+- 2026-02-02: 알림 읽음 처리 후 `GET /notifications/unread-count`을 호출해 전역 뱃지를 갱신하고, 메인 헤더는 숫자 대신 `hasUnread` boolean으로 빨간 점만 보여주는 방식으로 단순화함.
+- 2026-02-02: 알림 읽음 처리에서 POST를 PATCH로 변경하고 전체 읽음 버튼/호출을 제거해 현재 백엔드 스펙에 맞추며 즉시 상태를 업데이트함.
 - 2026-02-02: 알림 API(`src/api/notifications.ts`)와 `NotificationPage`를 만들고 토스트/읽음 처리/전체 읽음/상세 UI를 붙여 알림함을 구현했으며 CSS(`src/index.css`)도 추가하여 리스트/상태문구/카드 스타일을 갖췄음.
 - 2026-02-02: NotificationPage에 cursor 기반 페이징/무한스크롤을 추가하고, `getNotifications`/`NotificationListResponse`를 cursor(size/nextCursor)로 확장하여 더 많은 알림을 순차 로드할 수 있게 개선함.
 - 2026-02-02: NotificationPage 헤더에 뒤로가기/제목/서브텍스트/알림 아이콘+배지, 카드에 인용 텍스트, 상태 메시지, CSS 스타일을 강화하여 요구 UX를 충족시킴.
