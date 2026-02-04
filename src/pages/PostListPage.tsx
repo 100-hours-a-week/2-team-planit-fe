@@ -118,13 +118,12 @@ export default function PostListPage() {
         }
         setError('게시물을 불러오는 데 실패했습니다.')
       } finally {
-        if (cancelled) {
-          return
-        }
-        if (page === 0) {
-          setIsLoading(false)
-        } else {
-          setIsLoadingMore(false)
+        if (!cancelled) {
+          if (page === 0) {
+            setIsLoading(false)
+          } else {
+            setIsLoadingMore(false)
+          }
         }
       }
     }
