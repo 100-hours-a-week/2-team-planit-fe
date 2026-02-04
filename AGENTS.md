@@ -1,5 +1,8 @@
+## 작업일지
+- 2026-02-04: HomePage의 unread 상태를 user 유무에 따라 파생하고 dropdown/배지 로직을 정리하며 TripCreatePage catch에 error 로그를 추가해 `react-hooks/set-state-in-effect`/`@typescript-eslint/no-unused-vars` 경고를 제거하고 `npm run lint` 통과를 유지함.
+- 2026-02-04: merge 충돌 마커 제거하고 Notification/Post*/TripCreate/HomePage/AppRouter/CSS를 최신 상태로 맞춘 뒤 axios/Notification API/JSON payload 설정 및 ESLint 오류를 정리해 `npm run lint` 통과를 복구함.
 - 2026-02-03: `fetchNotificationCount`/ProfileDropdown 드롭다운/NotificationPage의 toast 로직을 리워크해 `Date.now()` 생성 로직을 공통 `createToastInfo`로 뽑고 ESLint 오류(impure/set-state-in-effect/exhaustive-deps 등)를 정리함.
-- 2026-02-03: PostListPage의 `finally` 블록에서 `return`을 제거해 `no-unsafe-finally` 오류를 해소하고 LIN트가 통과하도록 재정비함.
+- 2026-02-03: PostListPage의 `finally` 블록에서 `return`을 제거해 `no-unsafe-finally` 오류를 해소하고 LINt가 통과하도록 재정비함.
 - 2026-02-03: eslint 경고/에러를 모두 해결하여 `npm run lint`가 다시 통과하도록 정비함.
 - 2026-02-03: S3/CloudFront 기반 이미지 배포를 위한 도메인 전환 및 정책/CORS/캐시/프론트 URL 가이드를 설계·문서화함.
 - 2026-02-03: axios request/response 인터셉터를 정비해 accessToken을 일관 주입하고 401 시 토큰 삭제/로그인 리다이렉트로 인증 흐름을 방어함.
@@ -26,7 +29,7 @@
 - 2026-01-30: Axios 응답 인터셉터에서 401 시 전역 리다이렉트/로그아웃을 제거하고 `auth.me()`를 `/users/me`로 맞춰 오류 시점에도 로그인 유지하도록 조정함.
 - 2026-01-30: 메인 페이지 헤더/커뮤니티/추천 섹션을 카드를 중심으로 재작성하고 알림 badge, 프로필 드롭다운, 로그인 안내 toast/NotificationPage 라우트를 정비함.
 - 2026-01-30: Axios request 인터셉터에서 headers 초기값을 보장해 accessToken이 Authorization 헤더로 붙지 않아 발생하던 401 에러를 제거함.
-- 2026-01-30: AuthContext/Provider를 추가해 로그인 시 사용자 정보를 전역으로 관리하고 Home/MyPage/Header의 프로필 업로드/프리뷰 로직을 리팩토링함.
+- 2026-01-30: AuthContext/Provider를 추가해 로그인 시 사용자 정보를 전역으로 관리하고 Home/MyPage/Header의 프로필 업로드/프리뷰 로직을 리팩터링함.
 - 2026-01-30: `src/store/index.ts` export 경로를 `.tsx`로 명시하여 Vite가 `/src/store/auth.ts` 404를 호출하지 않도록 정비하고 앱 부팅이 안전하게 유지되도록 확인함.
 - 2026-01-30: Auth context를 단일 소스로 정리해 profileImageUrl/로그아웃을 공유하고 MyPage 닉네임 중복 확인·파일 업로드·헤더 드롭다운을 state/UX 요구사항에 맞게 재구성함.
 - 2026-01-30: auth 상태의 저장 키를 `user`로 통합해 profileImageUrl을 포함한 전체 user 객체를 localStorage에 유지하고, MyPage에서 드롭다운 비활성화+입력 정리 및 프로필 업로드 UX를 정비함.

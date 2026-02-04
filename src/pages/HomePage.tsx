@@ -187,24 +187,25 @@ export default function HomePage() {
   const profileAvatarSrc = getImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
-  const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
+  const [unreadNotificationState, setUnreadNotificationState] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
   const dropdownIsOpen = Boolean(user) && dropdownOpen
+  const hasUnreadNotification = Boolean(user) && unreadNotificationState
 
   const fetchNotificationCount = useCallback(
     async (isCancelled: () => boolean = () => false) => {
       if (!loggedIn) {
-        setHasUnreadNotification(false)
+        setUnreadNotificationState(false)
         return
       }
       try {
         const result = await getMyPage()
         if (!isCancelled()) {
-          setHasUnreadNotification(result.notificationCount > 0)
+          setUnreadNotificationState(result.notificationCount > 0)
         }
       } catch {
         if (!isCancelled()) {
-          setHasUnreadNotification(false)
+          setUnreadNotificationState(false)
         }
       }
     },
@@ -229,7 +230,7 @@ export default function HomePage() {
         fetchNotificationCount()
         return
       }
-      setHasUnreadNotification(detail.count > 0)
+      setUnreadNotificationState(detail.count > 0)
     }
     window.addEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
     return () => {
@@ -286,6 +287,7 @@ export default function HomePage() {
       }
       navigate('/trips/itineraries', { state: { tripData: data } })
     } catch (error) {
+      console.error('handleMyTrips failed', error)
       showToast('일정 조회에 실패했습니다.')
     }
   }
@@ -331,17 +333,10 @@ export default function HomePage() {
 
   const handleLogout = () => {
     clearAuth()
-    setHasUnreadNotification(false)
+    setUnreadNotificationState(false)
     setDropdownOpen(false)
     navigate('/login')
   }
-
-  useEffect(() => {
-    if (!user) {
-      setDropdownOpen(false)
-      setHasUnreadNotification(false)
-    }
-  }, [user])
 
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
