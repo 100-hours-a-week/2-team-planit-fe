@@ -320,10 +320,7 @@ export default function MyPage() {
     event.target.value = ''
     setProfileImageUploading(true)
     try {
-      const { uploadUrl, key } = await getProfilePresignedUrl({
-        fileExtension: ext,
-        contentType: file.type || 'image/jpeg',
-      })
+      const { uploadUrl, key } = await getProfilePresignedUrl(ext, file.type || 'image/jpeg')
       const response = await fetch(uploadUrl, {
         method: 'PUT',
         body: file,
