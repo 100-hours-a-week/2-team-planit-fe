@@ -10,13 +10,18 @@ export default function AuthPageHeader({ ctaLabel, ctaRoute }: AuthPageHeaderPro
 
   return (
     <header className="auth-header">
-      <h1 className="logo-title">
-        <button type="button" className="logo-button" onClick={() => navigate('/')}>
-          PlanIt
-        </button>
-      </h1>
-      <div className="header-actions">
-        <button type="button" className="text-link" onClick={() => navigate(ctaRoute)}>
+      <div className="auth-header__content">
+        <div className="auth-header__brand">
+          <button type="button" className="auth-header__logo" onClick={() => navigate('/')}>
+            PlanIt
+          </button>
+          <p className="auth-header__tagline">계획을 실현할 수 있도록 깔끔하게 안내합니다.</p>
+        </div>
+        <button
+          type="button"
+          className="auth-header__cta"
+          onClick={() => navigate(ctaRoute)}
+        >
           {ctaLabel}
         </button>
       </div>
