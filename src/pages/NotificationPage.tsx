@@ -87,7 +87,7 @@ export default function NotificationPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  const safeNotifications = notifications ?? []
+  const safeNotifications = useMemo(() => notifications ?? [], [notifications])
   const unreadCount = useMemo(
     () => safeNotifications.reduce((count, item) => (item.isRead ? count : count + 1), 0),
     [safeNotifications],
@@ -184,7 +184,7 @@ export default function NotificationPage() {
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, nextCursor])
+  }, [loadingMore, nextCursor, accessToken])
 
   useEffect(() => {
     if (loadingMore || loading || !nextCursor) {

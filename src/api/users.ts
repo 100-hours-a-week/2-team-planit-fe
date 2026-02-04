@@ -1,13 +1,5 @@
 import api from './'
 
-/** Presigned URL 발급 응답 (프로필/게시물 공통) */
-export interface PresignedUrlResponse {
-  /** S3로 PUT할 presigned URL */
-  uploadUrl: string
-  key: string
-  expiresAt: string
-}
-
 export interface UserAvailabilityResponse {
   available: boolean
   message: string
@@ -77,23 +69,26 @@ export async function updateProfile(payload: UserUpdateRequest): Promise<UserPro
   return response.data
 }
 
-export async function withdrawUser(): Promise<void> {
-  await api.delete('/users/me')
+/** Presigned URL 발급 (프론트가 S3에 직접 업로드용) */
+export interface PresignedUrlRequest {
+  fileExtension: string
+  contentType?: string
 }
 
-/** 프로필 이미지 Presigned URL 발급 (확장자: jpg, jpeg, png, webp) */
+export interface PresignedUrlResponse {
+  uploadUrl: string
+  key: string
+  expiresAt: string
+}
+
 export async function getProfilePresignedUrl(
-  fileExtension: string,
-  contentType?: string,
+  request: PresignedUrlRequest
 ): Promise<PresignedUrlResponse> {
-  const response = await api.post<PresignedUrlResponse>(
-    '/users/profile-image/presigned-url',
-    { fileExtension, contentType: contentType ?? 'image/jpeg' },
-  )
+  const response = await api.post<PresignedUrlResponse>('/users/profile-image/presigned-url', request)
   return response.data
 }
 
-/** Presigned URL로 S3 업로드 완료 후 프로필 이미지 key 저장 */
+/** Presigned URL로 업로드 완료 후 key 저장 */
 export async function saveProfileImageKey(key: string): Promise<UserProfileResponse> {
   const response = await api.put<UserProfileResponse>('/users/me/profile-image', { key })
   return response.data
@@ -103,4 +98,8 @@ export async function saveProfileImageKey(key: string): Promise<UserProfileRespo
 export async function deleteProfileImage(): Promise<UserProfileResponse> {
   const response = await api.delete<UserProfileResponse>('/users/me/profile-image')
   return response.data
+}
+
+export async function withdrawUser(): Promise<void> {
+  await api.delete('/users/me')
 }
