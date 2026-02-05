@@ -335,9 +335,9 @@ export default function PostDetailPage() {
                 </div>
               )}
             </header>
-            <div className="post-detail-images">
-              {(detail.images?.filter((img) => img.url)?.length ?? 0) > 0 ? (
-                detail.images
+            {detail.images && detail.images.filter((img) => img.url).length > 0 && (
+              <div className="post-detail-images">
+                {detail.images
                   .filter((img) => img.url)
                   .map((image) => {
                     const imageSrc = resolveImageUrl(image.url, DEFAULT_AVATAR_URL)
@@ -346,11 +346,9 @@ export default function PostDetailPage() {
                         <img src={imageSrc} alt={`이미지 ${image.imageId}`} />
                       </figure>
                     )
-                  })
-              ) : (
-                <div className="post-detail-images--empty" aria-hidden="true" />
-              )}
-            </div>
+                  })}
+              </div>
+            )}
             <article className="post-detail-content">{detail.content}</article>
           </section>
           <section className="comment-input-shell">
