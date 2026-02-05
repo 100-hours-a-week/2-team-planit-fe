@@ -82,6 +82,10 @@ export default function PostListPage() {
   }, [])
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [location.key])
+
+  useEffect(() => {
     setPosts([])
     setHasMore(false)
     setError('')

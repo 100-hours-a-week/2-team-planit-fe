@@ -377,10 +377,13 @@ export default function MyPage() {
 
   const handleDeleteProfileImage = async () => {
     try {
-      await deleteProfileImage()
-      setAuth({ user: { ...authUser!, profileImageUrl: null }, accessToken: accessToken! })
+      const updated = await deleteProfileImage()
+      setAuth({
+        user: { ...authUser!, profileImageUrl: updated.profileImageUrl ?? null },
+        accessToken: accessToken!,
+      })
       setAvatarPreview(null)
-      setToastMessage('프로필 이미지가 삭제되었습니다.')
+      setToastMessage('기본 프로필로 되돌렸습니다.')
     } catch {
       setToastMessage('프로필 이미지 삭제에 실패했습니다.')
     }
