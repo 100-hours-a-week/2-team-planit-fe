@@ -493,6 +493,8 @@ export default function MyPage() {
     }
   }
 
+
+{/*
   const handleLoadTrips = async () => {
     setTripError('')
     setTripsLoading(true)
@@ -505,6 +507,7 @@ export default function MyPage() {
       setTripsLoading(false)
     }
   }
+*/}
 
   const handleTripDelete = async (tripId: number) => {
     const confirmed = window.confirm('해당 여행을 삭제하시겠습니까?')

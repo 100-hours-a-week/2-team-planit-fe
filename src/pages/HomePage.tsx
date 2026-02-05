@@ -202,6 +202,7 @@ export default function HomePage() {
     navigate('/trips/new')
   }
 
+{/*
   const handleViewMyPlans = () => {
     if (!loggedIn) {
       showLoginToast()
@@ -209,6 +210,7 @@ export default function HomePage() {
     }
     navigate('/mypage')
   }
+*/}
 
   const handleTogetherPlan = () => {
     if (!loggedIn) {
@@ -218,6 +220,7 @@ export default function HomePage() {
     showUnsupportedToast()
   }
 
+{/*}
   const handleMyTrips = () => {
     if (!loggedIn) {
       showLoginToast()
@@ -225,7 +228,7 @@ export default function HomePage() {
     }
     navigate('/mypage')
   }
-
+*/}
   const handleViewAll = () => {
     if (!loggedIn) {
       showLoginToast()
