@@ -105,6 +105,9 @@ type ActivityDraft = {
   startTime?: string
 }
 
+const getApiErrorCode = (error: unknown) =>
+  (error as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
+
 export default function TripCreatePage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -297,7 +300,12 @@ export default function TripCreatePage() {
         setPage('form')
       }
     } catch (error) {
-      setSubmitState({ loading: false, error: String(error) })
+      if (getApiErrorCode(error) === 'TRIP_007') {
+        showToast('일정생성은 하루에 1회만 가능합니다')
+        setSubmitState({ loading: false, error: '' })
+      } else {
+        setSubmitState({ loading: false, error: String(error) })
+      }
       setPage('form')
     } finally {
       setSubmitState((prev) => ({ ...prev, loading: false }))
