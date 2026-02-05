@@ -1,9 +1,18 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AxiosError } from 'axios'
 import { signup } from '../api/auth'
-import { checkLoginId, checkNickname } from '../api/users'
+import {
+  checkLoginId,
+  checkNickname,
+  deleteSignupProfileImageByKey,
+  getSignupProfilePresignedUrl,
+} from '../api/users'
 import type { FormEvent } from 'react'
+import AuthPageHeader from '../components/AuthPageHeader'
+
+const ALLOWED_IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'webp']
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 const LOGIN_ID_PATTERN = /^[a-z0-9_]{4,20}$/
 const PASSWORD_PATTERN = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/
@@ -20,6 +29,8 @@ export default function SignupPage() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [nickname, setNickname] = useState('')
   const [profilePreview, setProfilePreview] = useState<string | null>(null)
+  const [profileImageKey, setProfileImageKey] = useState<string | null>(null)
+  const [profileImageUploading, setProfileImageUploading] = useState(false)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -84,13 +95,74 @@ export default function SignupPage() {
     }
   }
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const clearProfileImage = useCallback(async () => {
+    const keyToDelete = profileImageKey
+    setProfilePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    setProfileImageKey(null)
+    if (keyToDelete) {
+      try {
+        await deleteSignupProfileImageByKey(keyToDelete)
+      } catch {
+        // S3 삭제 실패해도 UI는 이미 초기화됨
+      }
+    }
+  }, [profileImageKey])
+
+  useEffect(() => {
+    return () => {
+      if (profilePreview) URL.revokeObjectURL(profilePreview)
+    }
+  }, [profilePreview])
+
+  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0] ?? null
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setProfilePreview(url)
-    } else {
-      setProfilePreview(null)
+    event.currentTarget.value = ''
+    if (!file) return
+    const ext = file.name.toLowerCase().split('.').pop() ?? ''
+    if (!ALLOWED_IMAGE_TYPES.includes(ext)) {
+      setErrorMessage('*jpg, png, webp 형식만 업로드 가능합니다.')
+      return
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setErrorMessage('*이미지 크기는 최대 5MB까지 허용됩니다.')
+      return
+    }
+    setErrorMessage('')
+    const previousKey = profileImageKey
+    if (previousKey) {
+      try {
+        await deleteSignupProfileImageByKey(previousKey)
+      } catch {
+        // 교체 시 이전 이미지 S3 삭제 실패해도 새 업로드는 진행
+      }
+    }
+    setProfileImageUploading(true)
+    setProfilePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    setProfileImageKey(null)
+    try {
+      const { uploadUrl, key } = await getSignupProfilePresignedUrl(ext, file.type || 'image/jpeg')
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: await file.arrayBuffer(),
+        redirect: 'manual',
+      })
+      if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+        console.error('S3 redirect detected', response.status, response.headers.get('Location'))
+        throw new Error('S3 리다이렉트 발생. 버킷 리전이 ap-northeast-2인지 확인하세요.')
+      }
+      if (!response.ok) throw new Error('업로드 실패')
+      setProfileImageKey(key)
+      setProfilePreview(URL.createObjectURL(file))
+    } catch {
+      setErrorMessage('*프로필 이미지 업로드에 실패했습니다.')
+    } finally {
+      setProfileImageUploading(false)
     }
   }
 
@@ -105,13 +177,13 @@ export default function SignupPage() {
 
     setIsSubmitting(true)
     try {
-    await signup({
-      loginId,
-      password,
-      passwordConfirm,
-      nickname,
-      profileImageId: null,
-    })
+      await signup({
+        loginId,
+        password,
+        passwordConfirm,
+        nickname,
+        profileImageKey: profileImageKey ?? undefined,
+      })
       navigate('/login')
     } catch (error) {
       let remainingErrorMessage = '*회원가입에 실패했습니다.'
@@ -139,8 +211,10 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="page-shell">
-      <div className="form-card">
+    <>
+      <AuthPageHeader ctaLabel="로그인" ctaRoute="/login" />
+      <main className="page-shell">
+        <div className="form-card">
         <header className="form-header">
           <h1>Planit 회원가입</h1>
         </header>
@@ -236,7 +310,8 @@ export default function SignupPage() {
                 id="signupProfile"
                 name="signupProfile"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={profileImageUploading}
                 onChange={handleImageChange}
               />
               {profilePreview ? (
@@ -245,17 +320,20 @@ export default function SignupPage() {
                   <button
                     type="button"
                     className="remove-btn"
-                    onClick={() => setProfilePreview(null)}
+                    disabled={profileImageUploading}
+                    onClick={clearProfileImage}
                   >
                     삭제
                   </button>
                 </div>
               ) : (
-                '이미지 업로드'
+                profileImageUploading ? '업로드 중…' : '이미지 업로드'
               )}
             </div>
             <p className="helper-text">
-              {profilePreview ? '이미지가 선택되었습니다.' : '프로필 사진은 선택 사항입니다.'}
+              {profilePreview
+                ? '이미지가 선택되었습니다. 삭제 후 다시 선택하면 변경됩니다.'
+                : '프로필 사진은 선택 사항입니다. (jpg, png, webp, 최대 5MB)'}
             </p>
           </div>
 
@@ -274,5 +352,6 @@ export default function SignupPage() {
         </footer>
       </div>
     </main>
+  </>
   )
 }

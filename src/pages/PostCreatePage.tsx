@@ -1,24 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createPost } from '../api/posts'
+import { createPost, deletePostImageByKey, getPostPresignedUrl } from '../api/posts'
 import Toast from '../components/Toast'
 
 const BOARD_DESCRIPTION = '자유게시판에서는 여행과 일정 정보, 경험을 나누는 공간입니다.'
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
+
+function getFileExtension(file: File): string {
+  const name = file.name.toLowerCase()
+  const ext = name.includes('.') ? name.split('.').pop()! : ''
+  return ALLOWED_EXTENSIONS.includes(ext as (typeof ALLOWED_EXTENSIONS)[number]) ? ext : 'jpg'
+}
 
 export default function PostCreatePage() {
   const navigate = useNavigate()
-  const [boardType] = useState('FREE')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [imageKeys, setImageKeys] = useState<string[]>([])
+  const [previews, setPreviews] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
 
-  const toastKeyRef = useRef(0)
   const showToast = (message: string) => {
-    setToastInfo({ message, key: ++toastKeyRef.current })
+    setToastInfo({ message, key: Date.now() })
   }
 
   useEffect(() => {
@@ -27,22 +34,65 @@ export default function PostCreatePage() {
     }
   }, [])
 
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    const urls = imageFiles.map((file) => URL.createObjectURL(file))
+    setPreviews(urls)
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [imageFiles])
+
+  const handleImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
-    if (!files) {
-      return
-    }
-    const selected = Array.from(files)
-    if (imageFiles.length + selected.length > 5) {
-      showToast('이미지는 최대 5장까지 선택할 수 있습니다.')
-    }
+    if (!files) return
+    const selected = Array.from(files).filter((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('이미지 크기는 최대 5MB까지 허용됩니다.')
+        return false
+      }
+      return true
+    })
     const toAdd = selected.slice(0, Math.max(0, 5 - imageFiles.length))
-    setImageFiles((prev) => [...prev, ...toAdd])
+    if (selected.length > toAdd.length) {
+      showToast('이미지는 최대 5장까지 업로드 가능합니다.')
+    }
     event.target.value = ''
+
+    for (const file of toAdd) {
+      try {
+        const ext = getFileExtension(file)
+        const { uploadUrl, key } = await getPostPresignedUrl(ext, file.type || 'image/jpeg')
+        // Presigned URL은 PUT용. redirect를 따르면 브라우저가 GET으로 바꿔 서명 불일치(403)가 난다.
+        const response = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: await file.arrayBuffer(),
+          redirect: 'manual',
+        })
+        if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+          const location = response.headers.get('Location') || '(none)'
+          console.error('S3 redirect detected', response.status, location)
+          throw new Error(`S3 리다이렉트 발생. 버킷 리전이 ap-northeast-2인지 확인하세요. Location: ${location}`)
+        }
+        if (!response.ok) {
+          const body = await response.text()
+          console.error('S3 PUT failed', response.status, body)
+          throw new Error(body || '업로드 실패')
+        }
+        setImageFiles((prev) => [...prev, file])
+        setImageKeys((prev) => [...prev, key])
+      } catch {
+        showToast('이미지 업로드에 실패했습니다.')
+      }
+    }
   }
 
   const handleRemoveImage = (index: number) => {
+    const keyToDelete = imageKeys[index]
     setImageFiles((prev) => prev.filter((_, idx) => idx !== index))
+    setImageKeys((prev) => prev.filter((_, idx) => idx !== index))
+    if (keyToDelete) {
+      deletePostImageByKey(keyToDelete).catch(() => {})
+    }
   }
 
   const validate = () => {
@@ -63,19 +113,14 @@ export default function PostCreatePage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!validate()) {
-      return
-    }
-    const payload = {
-      boardType,
-      title: title.trim(),
-      content: content.trim(),
-      imageKeys: [],
-    }
-
+    if (!validate()) return
     setIsSubmitting(true)
     try {
-      const result = await createPost(payload)
+      const result = await createPost({
+        title: title.trim(),
+        content: content.trim(),
+        imageKeys: imageKeys.length > 0 ? imageKeys : undefined,
+      })
       navigate(`/posts/${result.postId}`)
     } catch {
       showToast('게시글 작성에 실패했습니다.')
@@ -86,6 +131,7 @@ export default function PostCreatePage() {
 
   const contentHint = useMemo(() => `${content.length}/2000`, [content.length])
   const isFormValid = Boolean(title.trim() && content.trim())
+  const boardType = 'FREE'
 
   return (
     <main className="post-create-shell">
@@ -126,13 +172,13 @@ export default function PostCreatePage() {
           {errors.content && <p className="form-error">{errors.content}</p>}
         </div>
         <div className="form-group">
-          <label>이미지 (선택사항 / 추후 업로드 가능)</label>
+          <label>이미지 (최대 5장, 5MB 이하)</label>
           <input type="file" accept="image/*" multiple onChange={handleImageChange} />
-          {imageFiles.length > 0 && (
+          {previews.length > 0 && (
             <div className="image-preview-grid">
-              {imageFiles.map((file, index) => (
-                <figure key={`${file.name}-${index}`}>
-                  <p>{file.name}</p>
+              {previews.map((src, index) => (
+                <figure key={`${src}-${index}`}>
+                  <img src={src} alt={`선택한 이미지 ${index + 1}`} />
                   <button type="button" onClick={() => handleRemoveImage(index)}>
                     삭제
                   </button>
@@ -140,7 +186,6 @@ export default function PostCreatePage() {
               ))}
             </div>
           )}
-          <p className="form-hint">이미지 업로드는 서버 이미지 API 준비 시 적용됩니다.</p>
         </div>
         <div className="form-actions">
           <button type="button" className="secondary-btn" onClick={() => navigate('/posts')}>

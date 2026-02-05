@@ -1,5 +1,4 @@
 import React from 'react'
-import { isTokenExpired } from '../utils/token'
 
 export type User = {
   id: number
@@ -50,15 +49,10 @@ export const authStore: AuthState = {
     }
     try {
       const parsed = JSON.parse(raw)
-      const storedToken = parsed?.accessToken ?? null
-      if (!storedToken || isTokenExpired(storedToken)) {
-        authStore.clearAuth()
-        return
-      }
       authStore.user = parsed?.user ?? null
-      authStore.accessToken = storedToken
+      authStore.accessToken = parsed?.accessToken ?? null
     } catch {
-      authStore.clearAuth()
+      // ignore malformed cache
     }
   },
 }

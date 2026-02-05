@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import ProfileDropdown from '../components/ProfileDropdown'
 import Toast from '../components/Toast'
-import { getMyPage } from '../api/users'
 import { useAuth } from '../store'
-import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { resolveImageUrl } from '../utils/image.ts'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
 
@@ -33,7 +29,7 @@ const BOARD_POSTS: BoardPost[] = [
     postId: 401,
     boardType: '자유 게시판',
     title: '한라산이 보여준 겨울의 시간표',
-    content: '산행 루트부터 온천, 숙소까지 하루 스케줄을 공유합니다.',
+    content: '산행 루트부터 온천, 숙소까지 하루 스케줄을 공유합니다',
     likeCount: 1280,
     commentCount: 62,
     createdAt: '2026-01-30T09:10:00.000Z',
@@ -179,60 +175,15 @@ const truncateText = (text: string, limit: number) => (text.length > limit ? `${
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const profileButtonRef = useRef<HTMLButtonElement>(null)
-  const { user, clearAuth } = useAuth()
+  const { user } = useAuth()
   const loggedIn = Boolean(user)
-  const profileAvatarSrc = resolveImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
-  const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
-
-  const fetchNotificationCount = useCallback(
-    async (isCancelled: () => boolean = () => false) => {
-      if (!loggedIn) {
-        setHasUnreadNotification(false)
-        return
-      }
-      try {
-        const result = await getMyPage()
-        if (!isCancelled()) {
-          setHasUnreadNotification(result.notificationCount > 0)
-        }
-      } catch {
-        if (!isCancelled()) {
-          setHasUnreadNotification(false)
-        }
-      }
-    },
-    [loggedIn],
-  )
-
-  useEffect(() => {
-    let cancelled = false
-    fetchNotificationCount(() => cancelled)
-    return () => {
-      cancelled = true
-    }
-  }, [fetchNotificationCount])
-
-  useEffect(() => {
-    const handleUnreadBadgeUpdate = (event: Event) => {
-      const detail = (event as CustomEvent<{ count: number }> | undefined)?.detail
-      if (detail === undefined) {
-        fetchNotificationCount()
-        return
-      }
-      setHasUnreadNotification(detail.count > 0)
-    }
-    window.addEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
-    return () => {
-      window.removeEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
-    }
-  }, [fetchNotificationCount])
+  const toastKeyRef = useRef(0)
 
   const showToast = (message: string) => {
-    setToastInfo({ message, key: Date.now() })
+    toastKeyRef.current += 1
+    setToastInfo({ message, key: toastKeyRef.current })
   }
 
   const showLoginToast = () => {
@@ -243,20 +194,20 @@ export default function HomePage() {
     showToast(BOARD_UNSUPPORTED_TOAST)
   }
 
-  const handleNotificationClick = () => {
-    if (!loggedIn) {
-      showLoginToast()
-      return
-    }
-    navigate('/notifications')
-  }
-
   const handleSoloPlan = () => {
     if (!loggedIn) {
       showLoginToast()
       return
     }
     navigate('/trips/new')
+  }
+
+  const handleViewMyPlans = () => {
+    if (!loggedIn) {
+      showLoginToast()
+      return
+    }
+    navigate('/mypage')
   }
 
   const handleTogetherPlan = () => {
@@ -299,28 +250,6 @@ export default function HomePage() {
     navigate(`/posts/${postId}`)
   }
 
-  const handleNavigateLogin = () => {
-    setDropdownOpen(false)
-    navigate('/login')
-  }
-
-  const handleNavigateSignup = () => {
-    setDropdownOpen(false)
-    navigate('/signup')
-  }
-
-  const handleNavigateMyPage = () => {
-    setDropdownOpen(false)
-    navigate('/mypage')
-  }
-
-  const handleLogout = () => {
-    clearAuth()
-    setHasUnreadNotification(false)
-    setDropdownOpen(false)
-    navigate('/login')
-  }
-
   const sortedBoardPosts = useMemo(() => {
     return [...BOARD_POSTS]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -332,46 +261,6 @@ export default function HomePage() {
 
   return (
     <main className="home-shell">
-      <header className="home-header">
-        <h1 className="logo-title">
-          <button type="button" className="logo-button" onClick={() => window.location.reload()}>
-            PlanIt
-          </button>
-        </h1>
-        <div className="header-actions">
-          <button type="button" className="notification-button" onClick={handleNotificationClick}>
-          <span className="sr-only">알림함</span>
-          <span aria-hidden="true">🔔</span>
-          {hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
-          </button>
-          <div className="profile-wrapper">
-            <button
-              type="button"
-              ref={profileButtonRef}
-              className="profile-trigger"
-              onClick={() => setDropdownOpen((prev) => !prev)}
-            >
-              <div className="profile-avatar">
-                <img
-                  src={profileAvatarSrc}
-                  alt={loggedIn && user ? `${user.loginId} 프로필` : 'PlanIt 기본 아바타'}
-                />
-              </div>
-            </button>
-            <ProfileDropdown
-              open={dropdownOpen}
-              onClose={() => setDropdownOpen(false)}
-              anchorRef={profileButtonRef}
-              user={user}
-              onNavigateLogin={handleNavigateLogin}
-              onNavigateSignup={handleNavigateSignup}
-              onNavigateMyPage={handleNavigateMyPage}
-              onLogout={handleLogout}
-            />
-          </div>
-        </div>
-      </header>
-
       <div className="home-content">
         <section className="launch-section">
           <div>

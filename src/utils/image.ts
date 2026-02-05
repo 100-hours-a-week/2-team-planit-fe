@@ -1,36 +1,45 @@
-const CLOUDFRONT_BASE_URL = (import.meta.env.VITE_CLOUDFRONT_URL ?? '').replace(/\/+$/, '')
-const DEFAULT_FALLBACK = '/default-avatar.png'
+/**
+ * 이미지 URL 처리.
+ * - null/빈 문자열이면 defaultUrl 반환
+ * - 백엔드에서 S3/CloudFront 절대 URL이면 그대로 사용
+ * - S3 키만 오면 CLOUDFRONT_BASE_URL이 있을 때만 조합, 없으면 defaultUrl
+ */
 
-const stripLeadingSlash = (value: string) => value.replace(/^\/+/, '')
+const CLOUDFRONT_BASE_URL =
+  (import.meta.env.VITE_CLOUDFRONT_BASE_URL as string)?.trim() || ''
 
-const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value)
-
-const normalizeObjectKey = (objectKey?: string | null) => {
-  if (!objectKey) {
-    return ''
-  }
-  return objectKey.trim()
+function isAbsoluteUrl(s: string): boolean {
+  return /^https?:\/\//i.test(s.trim())
 }
 
-export function getImageUrl(objectKey?: string | null, fallback?: string) {
-  const normalizedKey = normalizeObjectKey(objectKey)
-  if (!normalizedKey) {
-    return fallback ?? DEFAULT_FALLBACK
+function normalizeObjectKey(
+  key: string | null | undefined
+): string | null {
+  if (key == null || typeof key !== 'string') return null
+  const t = key.trim()
+  return t === '' ? null : t
+}
+
+function stripLeadingSlash(s: string): string {
+  return s.replace(/^\/+/, '')
+}
+
+export function resolveImageUrl(
+  url: string | null | undefined,
+  defaultUrl: string
+): string {
+  const normalized = normalizeObjectKey(url)
+  if (!normalized) {
+    return defaultUrl
   }
 
-  if (isAbsoluteUrl(normalizedKey)) {
-    if (import.meta.env.MODE !== 'production') {
-      console.warn('Invalid image src, forcing CloudFront fallback:', normalizedKey)
-    }
-    return fallback ?? DEFAULT_FALLBACK
+  if (isAbsoluteUrl(normalized)) {
+    return normalized
   }
 
   if (!CLOUDFRONT_BASE_URL) {
-    return fallback ?? DEFAULT_FALLBACK
+    return defaultUrl
   }
 
-  const keyWithoutSlash = stripLeadingSlash(normalizedKey)
-  return `${CLOUDFRONT_BASE_URL}/${keyWithoutSlash}`
+  return `${CLOUDFRONT_BASE_URL}/${stripLeadingSlash(normalized)}`
 }
-
-export const resolveImageUrl = getImageUrl

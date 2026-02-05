@@ -31,7 +31,8 @@ export interface PostDetail {
   }
   images: {
     imageId: number
-    url?: string
+    key?: string | null
+    url?: string | null
   }[]
   likeCount: number
   commentCount: number
@@ -70,11 +71,19 @@ export interface CreateCommentPayload {
 export interface CreatePostPayload {
   title: string
   content: string
+  imageKeys?: string[]
 }
 
 export interface UpdatePostPayload {
   title?: string
   content?: string
+  imageKeys?: string[]
+}
+
+export interface PresignedUrlResponse {
+  uploadUrl: string
+  key: string
+  expiresAt: string
 }
 
 const BASE_PATH = '/posts'
@@ -148,17 +157,37 @@ export interface PostCreateResponse {
   imageIds: number[]
 }
 
-export async function createPost(payload: CreatePostPayload & { imageKeys?: string[] }): Promise<PostCreateResponse> {
+export async function getPostPresignedUrl(
+  fileExtension: string,
+  contentType?: string
+): Promise<PresignedUrlResponse> {
+  const response = await api.post<PresignedUrlResponse>(
+    `${BASE_PATH}/images/presigned-url`,
+    { fileExtension, contentType }
+  )
+  return response.data
+}
+
+export async function createPost(payload: CreatePostPayload): Promise<PostCreateResponse> {
   const response = await api.post<PostCreateResponse>(BASE_PATH, payload)
   return response.data
 }
 
-export async function updatePost(
-  id: string | number,
-  payload: UpdatePostPayload & { imageKeys?: string[] },
-): Promise<PostCreateResponse> {
+export async function updatePost(id: string, payload: UpdatePostPayload): Promise<PostCreateResponse> {
   const response = await api.patch<PostCreateResponse>(`${BASE_PATH}/${id}`, payload)
   return response.data
+}
+
+export async function deletePostImage(
+  postId: number,
+  imageId: number
+): Promise<void> {
+  await api.delete(`${BASE_PATH}/${postId}/images/${imageId}`)
+}
+
+/** 업로드만 하고 저장하지 않은 이미지 S3 삭제 (작성/수정 중 이미지 제거 시 호출) */
+export async function deletePostImageByKey(key: string): Promise<void> {
+  await api.delete(`${BASE_PATH}/images/by-key`, { params: { key } })
 }
 
 export async function deletePost(id: number | string): Promise<void> {

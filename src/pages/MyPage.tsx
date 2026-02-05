@@ -8,13 +8,16 @@ import {
   getMyPage,
   updateProfile,
   withdrawUser,
+  getProfilePresignedUrl,
+  saveProfileImageKey,
+  deleteProfileImage,
   type MyPageResponse,
 } from '../api/users'
 import { deletePlan, fetchPlans } from '../api/plans'
 import { deleteTrip, fetchTrips, type TripListItem } from '../api/trips'
 import { useAuth, type User } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
-import { getImageUrl } from '../utils/image'
+import { resolveImageUrl } from '../utils/image.ts'
 
 const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/
 const LOGIN_HELPER = '아이디는 영문 소문자와 숫자, _ 만 사용이 가능함'
@@ -188,12 +191,6 @@ export default function MyPage() {
   }, [authUser])
 
   useEffect(() => {
-    if (!authUser) {
-      setDropdownOpen(false)
-    }
-  }, [authUser])
-
-  useEffect(() => {
     let cancelled = false
     if (!authUser) {
       setPlans([])
@@ -339,23 +336,53 @@ export default function MyPage() {
     fileInputRef.current?.click()
   }
 
-  const handleProfileImageSelection = (event: ChangeEvent<HTMLInputElement>) => {
+  const [profileImageUploading, setProfileImageUploading] = useState(false)
+
+  const handleProfileImageSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) {
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      setToastMessage('이미지 크기는 최대 5MB까지 허용됩니다.')
       return
     }
-    const url = URL.createObjectURL(file)
-    setAvatarPreview(url)
+    const ext = file.name.toLowerCase().split('.').pop() || 'jpg'
+    if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+      setToastMessage('jpg, png, webp 형식만 업로드 가능합니다.')
+      return
+    }
     event.target.value = ''
+    setProfileImageUploading(true)
+    try {
+      const { uploadUrl, key } = await getProfilePresignedUrl(ext, file.type || 'image/jpeg')
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: await file.arrayBuffer(),
+        redirect: 'manual',
+      })
+      if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+        console.error('S3 redirect detected', response.status, response.headers.get('Location'))
+        throw new Error('S3 리다이렉트 발생. 버킷 리전이 ap-northeast-2인지 확인하세요.')
+      }
+      if (!response.ok) throw new Error('업로드 실패')
+      const updated = await saveProfileImageKey(key)
+      setAuth({ user: { ...authUser!, profileImageUrl: updated.profileImageUrl ?? null }, accessToken: accessToken! })
+      setAvatarPreview(URL.createObjectURL(file))
+      setToastMessage('프로필 이미지가 변경되었습니다.')
+    } catch {
+      setToastMessage('프로필 이미지 업로드에 실패했습니다.')
+    } finally {
+      setProfileImageUploading(false)
+    }
   }
 
-  const handleAvatarReset = () => {
-    if (avatarPreview) {
-      URL.revokeObjectURL(avatarPreview)
-    }
-    setAvatarPreview(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+  const handleDeleteProfileImage = async () => {
+    try {
+      await deleteProfileImage()
+      setAuth({ user: { ...authUser!, profileImageUrl: null }, accessToken: accessToken! })
+      setAvatarPreview(null)
+      setToastMessage('프로필 이미지가 삭제되었습니다.')
+    } catch {
+      setToastMessage('프로필 이미지 삭제에 실패했습니다.')
     }
   }
 
@@ -532,7 +559,7 @@ export default function MyPage() {
     return null
   }
 
-  const resolvedAuthAvatar = getImageUrl(authUser?.profileImageUrl, DEFAULT_AVATAR_URL)
+  const resolvedAuthAvatar = resolveImageUrl(authUser?.profileImageUrl, DEFAULT_AVATAR_URL)
   const hasAvatar = Boolean(avatarPreview) || Boolean(authUser.profileImageUrl)
   const currentAvatarSrc = avatarPreview ?? resolvedAuthAvatar
 
@@ -675,28 +702,30 @@ export default function MyPage() {
               <img src={currentAvatarSrc} alt={`${authUser.loginId} 프로필`} />
             </div>
             <div className="upload-helpers">
-              <button type="button" className="secondary-btn small" onClick={triggerFilePicker}>
-                이미지 업로드
+              <button
+                type="button"
+                className="secondary-btn small"
+                onClick={triggerFilePicker}
+                disabled={profileImageUploading}
+              >
+                {profileImageUploading ? '업로드 중...' : '이미지 업로드'}
               </button>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 ref={fileInputRef}
                 className="avatar-input"
                 hidden
                 onChange={handleProfileImageSelection}
               />
-              {avatarPreview && (
-                <button type="button" className="text-link" onClick={handleAvatarReset}>
-                  삭제
+              {(avatarPreview || authUser?.profileImageUrl) && (
+                <button type="button" className="text-link" onClick={handleDeleteProfileImage}>
+                  이미지 삭제
                 </button>
               )}
               {!avatarPreview && !authUser?.profileImageUrl && (
                 <p className="error-text helper-layer-text">*프로필 사진을 추가해주세요.</p>
               )}
-              <p className="helper-text helper-note">
-                현재 이미지 업로드는 미리보기만 제공되며 서버 반영은 추후 지원 예정입니다.
-              </p>
             </div>
           </div>
         </section>

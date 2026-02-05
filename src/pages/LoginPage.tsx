@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import AuthPageHeader from '../components/AuthPageHeader'
 import { login } from '../api/auth'
 import { useAuth } from '../store'
 
@@ -14,17 +15,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-  const loginIdError = loginIdTouched
-    ? loginId.length === 0
-      ? '*아이디를 입력해주세요.'
-      : loginId.length < 4
-      ? '*아이디가 너무 짧습니다.'
-      : loginId.length > 20
-      ? '*아이디는 20자 이하로 입력해주세요.'
-      : !/^[a-z0-9_]+$/.test(loginId)
-      ? '*아이디는 영문 소문자, 숫자, _ 만 허용됩니다.'
-      : ''
-    : ''
+  const loginIdError = loginIdTouched && loginId.length === 0 ? '*아이디를 입력해주세요.' : ''
 
   const passwordError = passwordTouched
     ? password.length === 0
@@ -63,8 +54,10 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="page-shell">
-      <div className="form-card">
+    <>
+      <AuthPageHeader ctaLabel="회원가입" ctaRoute="/signup" />
+      <main className="page-shell">
+        <div className="form-card">
         <header className="form-header">
           <h1>Planit 로그인</h1>
           <p className="subtitle">아이디와 비밀번호를 입력하고 나만의 계획을 확인하세요.</p>
@@ -82,10 +75,9 @@ export default function LoginPage() {
                 setLoginIdTouched(true)
               }}
               onBlur={() => setLoginIdTouched(true)}
-              placeholder="영문 소문자, 숫자, _"
+              placeholder="아이디를 입력해주세요"
               autoComplete="username"
             />
-            <p className="helper-text">아이디는 영문 소문자와 숫자, _ 만 사용 가능합니다.</p>
             {loginIdError && <p className="error-text">{loginIdError}</p>}
           </div>
 
@@ -120,7 +112,8 @@ export default function LoginPage() {
             회원가입
           </button>
         </footer>
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   )
 }
