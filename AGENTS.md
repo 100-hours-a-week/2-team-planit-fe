@@ -1,5 +1,6 @@
 ## 작업일지
-+ 2026-02-04: `/src/api/axios.ts` 요청 인터셉터를 로그인/회원가입은 제외하도록 수정해 `/auth/login`, `/users/signup` 요청에 Authorization 헤더가 붙지 않게 함.
+- 2026-02-05: 로그인 페이지 아이디 입력 중 조건 안내를 제거하고 입력이 없을 때만 `*아이디를 입력해주세요.` 오류만 보여주도록 정리함.
+- 2026-02-04: `/src/api/axios.ts` 요청 인터셉터를 로그인/회원가입은 제외하도록 수정해 `/auth/login`, `/users/signup` 요청에 Authorization 헤더가 붙지 않게 함.
 - 2026-02-04: 로컬 개발 시 `VITE_API_BASE_URL=http://localhost:8080/api`를 `.env.local`에 정의하고 axios가 환경변수를 우선 읽도록 변경해 dev 서버에서 localhost API를 호출하게 함.
 - 2026-02-04: 로그인/회원가입 전용 `AuthPageHeader` 추가하고 상단에 렌더링해 두 페이지에서도 헤더가 나타나도록 조정함.
 - 2026-02-04: 로그인/회원가입 전용 `AuthPageHeader`의 로고 배치·배경·간격·반응형 스타일을 전면 보강해 컬러 콘트라스트와 모바일 경험을 개선함.
