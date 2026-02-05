@@ -33,6 +33,7 @@ export default function PostEditPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
+  const [removedKeys, setRemovedKeys] = useState<string[]>([])
 
   const isAuthor = Boolean(detail && user && detail.author.authorId === user.id)
 
@@ -147,8 +148,20 @@ export default function PostEditPage() {
     }
   }
 
+  const trackRemovedKey = (key?: string) => {
+    if (!key) {
+      return
+    }
+    setRemovedKeys((prev) => (prev.includes(key) ? prev : [...prev, key]))
+  }
+
   const handleRemoveExistingImage = (index: number) => {
+    if (index < 0) {
+      return
+    }
+    const keyToDelete = imageKeys[index]
     setImageKeys((prev) => prev.filter((_, idx) => idx !== index))
+    trackRemovedKey(keyToDelete)
   }
 
   const handleRemoveNewImage = (index: number) => {
@@ -156,9 +169,7 @@ export default function PostEditPage() {
     const keyToDelete = imageKeys[existingCount + index]
     setNewFiles((prev) => prev.filter((_, idx) => idx !== index))
     setImageKeys((prev) => prev.filter((_, idx) => idx !== existingCount + index))
-    if (keyToDelete) {
-      deletePostImageByKey(keyToDelete).catch(() => {})
-    }
+    trackRemovedKey(keyToDelete)
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -179,6 +190,13 @@ export default function PostEditPage() {
         content: content.trim(),
         imageKeys: imageKeys.length > 0 ? imageKeys : undefined,
       })
+      if (removedKeys.length > 0) {
+        try {
+          await Promise.all(removedKeys.map((key) => deletePostImageByKey(key)))
+        } catch {
+          showToast('이미지 삭제에 실패했습니다.')
+        }
+      }
       navigate(`/posts/${result.postId}`)
     } catch {
       showToast('게시글 수정에 실패했습니다.')
