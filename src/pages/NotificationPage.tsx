@@ -83,6 +83,7 @@ export default function NotificationPage() {
   const [error, setError] = useState('')
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [markingId, setMarkingId] = useState<number | null>(null)
+  const [markingAll, setMarkingAll] = useState(false)
   const [nextCursor, setNextCursor] = useState<number | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -230,6 +231,29 @@ export default function NotificationPage() {
     navigate(`/posts/${item.postId}`)
   }
 
+  const handleMarkAllRead = async () => {
+    if (markingAll || unreadCount === 0) {
+      return
+    }
+    const targetIds = safeNotifications.filter((item) => !item.isRead).map((item) => item.notificationId)
+    if (targetIds.length === 0) {
+      return
+    }
+    setMarkingAll(true)
+    try {
+      await Promise.all(targetIds.map((id) => markNotificationRead(id)))
+      setNotifications((prev) =>
+        prev.map((notification) => (targetIds.includes(notification.notificationId) ? { ...notification, isRead: true } : notification)),
+      )
+      dispatchUnreadBadgeEvent(0)
+      showToast('모든 알림을 읽음 처리했습니다.')
+    } catch {
+      showToast('전체 알림 읽음 처리에 실패했습니다.')
+    } finally {
+      setMarkingAll(false)
+    }
+  }
+
   const handleBack = () => {
     navigate(-1)
   }
@@ -245,6 +269,14 @@ export default function NotificationPage() {
           <p className="notification-subtitle">새 소식과 활동 알림</p>
         </div>
         <div className="notification-header-actions">
+          <button
+            type="button"
+            className="notification-mark-all"
+            onClick={handleMarkAllRead}
+            disabled={unreadCount === 0 || markingAll}
+          >
+            전체 읽음
+          </button>
           <div className="notification-icon" aria-label="읽지 않은 알림">
             🔔
             {unreadCount > 0 && <span className="notification-icon__badge">{unreadCount}</span>}
