@@ -96,7 +96,7 @@ body {
   overflow: hidden;
 }
 
-.home-header {
+.app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;

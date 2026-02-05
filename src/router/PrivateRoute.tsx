@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import AppHeader from '../components/AppHeader'
 import { useAuth } from '../store'
 
 export default function PrivateRoute() {
@@ -9,5 +10,10 @@ export default function PrivateRoute() {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  return <Outlet />
+  return (
+    <>
+      <AppHeader />
+      <Outlet />
+    </>
+  )
 }
