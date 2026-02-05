@@ -50,6 +50,7 @@ export default function PostListPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [boardType, setBoardType] = useState<BoardType>(BOARD_TYPES[0])
   const [sortOption, setSortOption] = useState<SortParam>('latest')
@@ -80,6 +81,21 @@ export default function PostListPage() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 240)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [location.key])
 
   useEffect(() => {
     setPosts([])
@@ -367,6 +383,11 @@ export default function PostListPage() {
             <p className="post-status">더 이상 불러올 게시물이 없습니다.</p>
           )}
         </>
+      )}
+      {showScrollTop && (
+        <button type="button" className="scroll-top-btn" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+          맨 위로
+        </button>
       )}
     </main>
   )
