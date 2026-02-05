@@ -1,8 +1,8 @@
 import axios from 'axios'
 import { authStore } from '../store'
 
-const baseURL = 'https://planit-ai.store/api'
-//const baseURL = 'http://localhost:8080/api'
+const baseURL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || 'https://planit-ai.store/api'
 
 const api = axios.create({
   baseURL,
@@ -18,11 +18,9 @@ const redirectToLogin = () => {
 api.interceptors.request.use(
   (config) => {
     const token = authStore.accessToken
-    const headers = config.headers ?? {}
     if (token) {
-      headers.Authorization = `Bearer ${token}`
+      config.headers?.set('Authorization', `Bearer ${token}`)
     }
-    config.headers = headers
     return config
   },
   (error) => Promise.reject(error),
