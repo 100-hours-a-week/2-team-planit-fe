@@ -7,6 +7,7 @@ import {
   updateTripDay,
 } from '../api/trips'
 import type { TripData } from '../api/trips'
+import AppHeader from '../components/AppHeader'
 import './TripCreatePage.css'
 
 const CITY_OPTIONS = [
@@ -401,24 +402,27 @@ export default function TripCreatePage() {
 
   if (page === 'creating') {
     return (
-      <div className="planit-trip">
-        <div className="page creating">
-          <header className="topbar">
-            <div className="title-block">
-              <h1>{safeTitle || '일정 생성중'}</h1>
-              {periodLabel && <p>{periodLabel}</p>}
+      <main className="home-shell">
+        <AppHeader />
+        <div className="planit-trip">
+          <div className="page creating">
+            <header className="topbar">
+              <div className="title-block">
+                <h1>{safeTitle || '일정 생성중'}</h1>
+                {periodLabel && <p>{periodLabel}</p>}
+              </div>
+              <button className="pill-button" onClick={() => navigate('/')}>
+                홈으로
+              </button>
+            </header>
+            <div className="creating-body">
+              <p>여행 일정을 생성 중 입니다.</p>
+              <p>잠시만 기다려 주세요.</p>
+              <div className="dots">••••</div>
             </div>
-            <button className="pill-button" onClick={() => navigate('/')}>
-              홈으로
-            </button>
-          </header>
-          <div className="creating-body">
-            <p>여행 일정을 생성 중 입니다.</p>
-            <p>잠시만 기다려 주세요.</p>
-            <div className="dots">••••</div>
           </div>
         </div>
-      </div>
+      </main>
     )
   }
 
@@ -430,8 +434,10 @@ export default function TripCreatePage() {
     const dayId = typeof rawDayId === 'number' ? rawDayId : Number(rawDayId)
 
     return (
-      <div className="planit-trip">
-        <div className="page schedule">
+      <main className="home-shell">
+        <AppHeader />
+        <div className="planit-trip">
+          <div className="page schedule">
           <header className="schedule-header">
             <div className="title-block">
               <h1>{scheduleTitle}</h1>
@@ -742,24 +748,24 @@ export default function TripCreatePage() {
             </div>
           )}
 
+          </div>
         </div>
-      </div>
+      </main>
     )
   }
 
   return (
-    <div className="planit-trip">
-      <div className="page">
-        <header className="topbar">
-          <button className="icon-button" onClick={handleBack}>
-            ←
-          </button>
-          <h1>여행 정보 입력</h1>
-          <div className="topbar-actions">
-            <button className="pill-button">알림</button>
-            <div className="avatar">U</div>
-          </div>
-        </header>
+    <main className="home-shell">
+      <AppHeader />
+      <div className="planit-trip">
+        <div className="page">
+          <header className="topbar">
+            <button className="icon-button" onClick={handleBack}>
+              ←
+            </button>
+            <h1>여행 정보 입력</h1>
+            <div />
+          </header>
 
         {toast && <div className="toast">{toast}</div>}
 
@@ -1047,7 +1053,8 @@ export default function TripCreatePage() {
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </main>
   )
 }
