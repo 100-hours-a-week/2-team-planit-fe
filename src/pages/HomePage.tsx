@@ -218,6 +218,14 @@ export default function HomePage() {
     showUnsupportedToast()
   }
 
+  const handleMyTrips = () => {
+    if (!loggedIn) {
+      showLoginToast()
+      return
+    }
+    navigate('/mypage')
+  }
+
   const handleViewAll = () => {
     if (!loggedIn) {
       showLoginToast()
@@ -269,9 +277,11 @@ export default function HomePage() {
             <button type="button" className="secondary-btn" onClick={handleTogetherPlan}>
               같이 계획하기
             </button>
-            <button type="button" className="secondary-btn" onClick={handleViewMyPlans}>
-              내 일정 보기
+            {/*
+            <button type="button" className="secondary-btn" onClick={handleMyTrips}>
+              내 여행 보기
             </button>
+            */}
           </div>
         </section>
 

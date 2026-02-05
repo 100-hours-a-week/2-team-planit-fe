@@ -14,6 +14,7 @@ import {
   type MyPageResponse,
 } from '../api/users'
 import { deletePlan, fetchPlans } from '../api/plans'
+import { deleteTrip, fetchTrips, type TripListItem } from '../api/trips'
 import { useAuth, type User } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import { resolveImageUrl } from '../utils/image.ts'
@@ -60,6 +61,9 @@ export default function MyPage() {
   const authUser = user
   const [pageStats, setPageStats] = useState<MyPageResponse | null>(null)
   const [plans, setPlans] = useState<PlanItem[]>([])
+  const [trips, setTrips] = useState<TripListItem[]>([])
+  const [tripsLoading, setTripsLoading] = useState(false)
+  const [tripError, setTripError] = useState('')
   const [planError, setPlanError] = useState('')
   const [rowsLoading, setRowsLoading] = useState(true)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -235,6 +239,35 @@ export default function MyPage() {
       }
     }
   }, [avatarPreview])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!authUser) {
+      setTrips([])
+      setTripsLoading(false)
+      setTripError('')
+      return () => {
+        cancelled = true
+      }
+    }
+    setTripsLoading(true)
+    setTripError('')
+    fetchTrips()
+      .then((list) => {
+        if (!cancelled) setTrips(list)
+      })
+      .catch((fetchError: unknown) => {
+        if (!cancelled) {
+          setTripError(getErrorMessage(fetchError, '*내 여행 목록을 불러오지 못했습니다.'))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTripsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [authUser])
 
   const validateNickname = (value: string) => {
     if (!value.trim()) {
@@ -460,6 +493,31 @@ export default function MyPage() {
     }
   }
 
+  const handleLoadTrips = async () => {
+    setTripError('')
+    setTripsLoading(true)
+    try {
+      const list = await fetchTrips()
+      setTrips(list)
+    } catch (fetchError: unknown) {
+      setTripError(getErrorMessage(fetchError, '*내 여행 목록을 불러오지 못했습니다.'))
+    } finally {
+      setTripsLoading(false)
+    }
+  }
+
+  const handleTripDelete = async (tripId: number) => {
+    const confirmed = window.confirm('해당 여행을 삭제하시겠습니까?')
+    if (!confirmed) return
+    try {
+      await deleteTrip(tripId)
+      setTrips((prev) => prev.filter((trip) => trip.tripId !== tripId))
+      setToastMessage('*여행 삭제 완료')
+    } catch (fetchError: unknown) {
+      setTripError(getErrorMessage(fetchError, '*여행 삭제에 실패했습니다.'))
+    }
+  }
+
   const handleWithdraw = async () => {
     try {
       await withdrawUser()
@@ -676,10 +734,55 @@ export default function MyPage() {
           <header>
             <h2>내 계획</h2>
           </header>
+          {/*
+          <button type="button" className="secondary-btn" onClick={handleLoadTrips} disabled={tripsLoading}>
+            {tripsLoading ? '불러오는 중...' : '내 여행 보기'}
+          </button>
+          */}
+          {tripError && <p className="error-text">{tripError}</p>}
+          {trips.length === 0 && !tripsLoading && (
+            <p className="helper-text helper-fixed">*아직 생성된 여행이 없습니다.</p>
+          )}
+          <div className="trip-list">
+            {trips.map((trip) => (
+              <article
+                key={trip.tripId}
+                className="trip-card"
+                onClick={() => navigate(`/trips/${trip.tripId}/itineraries`, { state: { tripId: trip.tripId } })}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    navigate(`/trips/${trip.tripId}/itineraries`, { state: { tripId: trip.tripId } })
+                  }
+                }}
+              >
+                <div>
+                  <strong>{trip.title}</strong>
+                  <p className="plan-meta">
+                    {trip.startDate} ~ {trip.endDate}
+                    <span className="dot" />
+                    {trip.travelCity}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="plan-card-delete"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleTripDelete(trip.tripId)
+                  }}
+                >
+                  삭제
+                </button>
+              </article>
+            ))}
+          </div>
           {planError && <p className="error-text">{planError}</p>}
           {planList.length === 0 && !rowsLoading && (
             <p className="helper-text helper-fixed">*아직 생성된 계획이 없습니다.</p>
           )}
+          {/*}
           <div className="plan-list">
             {planList.map((plan) => (
               <article
@@ -718,6 +821,7 @@ export default function MyPage() {
               </article>
             ))}
           </div>
+            */}
         </section>
 
         <div className="danger-zone">

@@ -430,6 +430,12 @@
   margin: 4px 0;
 }
 
+.planit-trip .activity-card .memo {
+  font-size: 14px;
+  color: #7c7c7c;
+  margin: 2px 0 6px;
+}
+
 .planit-trip .activity-card .meta {
   display: flex;
   justify-content: space-between;
