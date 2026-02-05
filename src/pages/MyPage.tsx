@@ -753,6 +753,7 @@ export default function MyPage() {
           {planList.length === 0 && !rowsLoading && (
             <p className="helper-text helper-fixed">*아직 생성된 계획이 없습니다.</p>
           )}
+          {/*}
           <div className="plan-list">
             {planList.map((plan) => (
               <article
@@ -791,6 +792,7 @@ export default function MyPage() {
               </article>
             ))}
           </div>
+            */}
         </section>
 
         <div className="danger-zone">
