@@ -7,6 +7,7 @@ import { resolveImageUrl } from '../utils/image.ts'
 import { getPosts } from '../api/posts'
 import type { PostListItem, SortParam } from '../api/posts'
 import { useAuth } from '../store'
+import { createPortal } from 'react-dom'
 
 const BOARD_TYPES = ['자유 게시판', '일정 공유', '장소 추천'] as const
 const PAGE_SIZE = 10
@@ -46,11 +47,22 @@ const formatTimeAgo = (value: string) => {
 
 type BoardType = (typeof BOARD_TYPES)[number]
 
+const ScrollTopButton = () => {
+  if (typeof document === 'undefined') {
+    return null
+  }
+  return createPortal(
+    <button type="button" className="scroll-top-btn" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+      맨 위로
+    </button>,
+    document.body,
+  )
+}
+
 export default function PostListPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
-  const [showScrollTop, setShowScrollTop] = useState(false)
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [boardType, setBoardType] = useState<BoardType>(BOARD_TYPES[0])
   const [sortOption, setSortOption] = useState<SortParam>('latest')
@@ -79,17 +91,6 @@ export default function PostListPage() {
       if (navigateTimeout.current) {
         window.clearTimeout(navigateTimeout.current)
       }
-    }
-  }, [])
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 240)
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    handleScroll()
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
     }
   }, [])
 
@@ -332,7 +333,7 @@ export default function PostListPage() {
         </p>
       ) : (
         <>
-          <section className="post-grid" aria-live="polite">
+        <section className="post-grid" aria-live="polite">
             {posts.map((post) => (
               <article
                 key={post.postId}
@@ -384,11 +385,7 @@ export default function PostListPage() {
           )}
         </>
       )}
-      {showScrollTop && (
-        <button type="button" className="scroll-top-btn" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          맨 위로
-        </button>
-      )}
+      <ScrollTopButton />
     </main>
   )
 }
