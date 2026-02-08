@@ -196,6 +196,97 @@
   gap: 8px;
 }
 
+.planit-trip .place-search-panel {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planit-trip .place-search-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planit-trip .place-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.planit-trip .place-search-input {
+  display: flex;
+  gap: 8px;
+}
+
+.planit-trip .place-search-input input {
+  flex: 1;
+}
+
+.planit-trip .place-results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planit-trip .place-result-row {
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.planit-trip .place-result-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.planit-trip .place-result-info span {
+  font-size: 12px;
+  color: #7c7c7c;
+}
+
+.planit-trip .place-result-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.planit-trip .place-empty {
+  font-size: 12px;
+  color: #7c7c7c;
+  margin: 0;
+}
+
+.planit-trip .selected-place-card {
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fafafa;
+}
+
+.planit-trip .selected-place-card p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #7c7c7c;
+}
+
+.planit-trip .selected-place-meta {
+  font-size: 12px;
+  color: #7c7c7c;
+}
+
 .planit-trip .place-item {
   display: flex;
   align-items: center;
