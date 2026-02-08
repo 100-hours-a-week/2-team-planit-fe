@@ -7,6 +7,9 @@ import {
   updateTripDay,
 } from '../api/trips'
 import type { TripData } from '../api/trips'
+import AppHeader from '../components/AppHeader'
+import PlaceSearchPanel from '../components/PlaceSearchPanel'
+import type { PlaceSearchItem } from '../types/place'
 import './TripCreatePage.css'
 
 const CITY_OPTIONS = [
@@ -62,6 +65,39 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 const CREATE_ALLOWED_START_HOUR = 14
 const CREATE_ALLOWED_END_HOUR = 2
 
+const DESTINATION_CODE_BY_LABEL: Record<string, string> = {
+  '가오슝, 대만': 'KAOHSIUNG_TW',
+  '괌, 미국': 'GUAM_US',
+  '나고야, 일본': 'NAGOYA_JP',
+  '나트랑, 베트남': 'NHA_TRANG_VN',
+  '다낭, 베트남': 'DA_NANG_VN',
+  '도쿄, 일본': 'TOKYO_JP',
+  '런던, 영국': 'LONDON_GB',
+  '로마, 이탈리아': 'ROME_IT',
+  '마닐라, 필리핀': 'MANILA_PH',
+  '마카오, 중국': 'MACAU_CN',
+  '바르셀로나, 스페인': 'BARCELONA_ES',
+  '방콕, 태국': 'BANGKOK_TH',
+  '보라카이, 필리핀': 'BORACAY_PH',
+  '보홀, 필리핀': 'BOHOL_PH',
+  '사이판, 미국': 'SAIPAN_US',
+  '삿포로, 일본': 'SAPPORO_JP',
+  '상하이, 중국': 'SHANGHAI_CN',
+  '세부, 필리핀': 'CEBU_PH',
+  '싱가포르, 싱가포르': 'SINGAPORE_SG',
+  '오사카, 일본': 'OSAKA_JP',
+  '오키나와, 일본': 'OKINAWA_JP',
+  '치앙마이, 태국': 'CHIANG_MAI_TH',
+  '코타키나발루, 말레이시아': 'KOTA_KINABALU_MY',
+  '쿠알라룸푸르, 말레이시아': 'KUALA_LUMPUR_MY',
+  '타이베이, 대만': 'TAIPEI_TW',
+  '파리, 프랑스': 'PARIS_FR',
+  '푸꾸옥, 베트남': 'PHU_QUOC_VN',
+  '하노이, 베트남': 'HANOI_VN',
+  '홍콩, 중국': 'HONG_KONG_CN',
+  '후쿠오카, 일본': 'FUKUOKA_JP',
+}
+
 const formatDisplayDate = (dateStr: string) => {
   if (!dateStr) return ''
   const [y, m, d] = dateStr.split('-')
@@ -94,8 +130,12 @@ const calcDays = (start: string, end: string) => {
 type SubmitState = { loading: boolean; error: string }
 
 type PlaceItem = {
-  id: number
+  id: string
   name: string
+  address: string
+  googlePlaceId: string
+  googleMapUrl: string
+  marker: { lat: number; lng: number }
 }
 
 type ActivityDraft = {
@@ -125,7 +165,6 @@ export default function TripCreatePage() {
   const [showTitleHelp, setShowTitleHelp] = useState(false)
   const [showBudgetHelp, setShowBudgetHelp] = useState(false)
   const [showDateModal, setShowDateModal] = useState(false)
-  const [showPlaceModal, setShowPlaceModal] = useState(false)
   const [showBackConfirm, setShowBackConfirm] = useState(false)
   const [toast, setToast] = useState('')
   const [dateError, setDateError] = useState('')
@@ -141,8 +180,7 @@ export default function TripCreatePage() {
   const [editDrafts, setEditDrafts] = useState<Record<number, ActivityDraft>>({})
   const [currentTime, setCurrentTime] = useState(() => new Date())
 
-  const [placeDraft, setPlaceDraft] = useState('')
-  const showWantedPlaceSection = false
+  const showWantedPlaceSection = true
 
   const routeTripId = Number(params.tripId)
   const stateTripId = Number((location.state as { tripId?: number } | null)?.tripId)
@@ -198,13 +236,6 @@ export default function TripCreatePage() {
     themes.length > 0 ||
     wantedPlaces.length > 0
 
-  const hasOutOfCityPlace = useMemo(() => {
-    if (!travelCity || wantedPlaces.length === 0) return false
-    const cityKey = travelCity.split(',')[0]?.trim()
-    if (!cityKey) return false
-    return wantedPlaces.some((place) => !place.name.includes(cityKey))
-  }, [travelCity, wantedPlaces])
-
   const dateDisplay =
     arrivalDate && departureDate
       ? `${formatDisplayDate(arrivalDate)} - ${formatDisplayDate(departureDate)}`
@@ -233,23 +264,27 @@ export default function TripCreatePage() {
     )
   }
 
-  const handleAddPlace = () => {
-    const trimmed = placeDraft.trim()
-    if (!trimmed) return
-    const next = { id: Date.now(), name: trimmed }
-    setWantedPlaces((prev) => [...prev, next])
-    setPlaceDraft('')
-
-    if (travelCity) {
-      const cityKey = travelCity.split(',')[0]?.trim()
-      if (cityKey && !trimmed.includes(cityKey)) {
-        showToast('여행지에서 벗어나는 장소입니다.')
-      }
-    }
+  const handleRemovePlace = (id: string) => {
+    setWantedPlaces((prev) => prev.filter((item) => item.id !== id))
   }
 
-  const handleRemovePlace = (id: number) => {
-    setWantedPlaces((prev) => prev.filter((item) => item.id !== id))
+  const handlePlaceSelected = (place: PlaceSearchItem) => {
+    setWantedPlaces((prev) => {
+      if (prev.some((item) => item.googlePlaceId === place.googlePlaceId)) {
+        return prev
+      }
+      return [
+        ...prev,
+        {
+          id: place.googlePlaceId,
+          name: place.name,
+          address: place.address,
+          googlePlaceId: place.googlePlaceId,
+          googleMapUrl: place.googleMapUrl,
+          marker: place.marker,
+        },
+      ]
+    })
   }
 
   const handleBack = () => {
@@ -265,11 +300,6 @@ export default function TripCreatePage() {
 
     if (!requiredReady) return
 
-    if (hasOutOfCityPlace) {
-      showToast('장소 선택에서 여행지에 벗어나는 장소가 포함되어 있습니다.')
-      return
-    }
-
     const payload = {
       title: title.trim(),
       arrivalDate,
@@ -279,7 +309,7 @@ export default function TripCreatePage() {
       travelCity,
       totalBudget: budgetValue,
       travelTheme: themes,
-      wantedPlace: wantedPlaces.map((place) => place.name),
+      wantedPlace: wantedPlaces.map((place) => place.googlePlaceId),
     }
 
     try {
@@ -401,24 +431,27 @@ export default function TripCreatePage() {
 
   if (page === 'creating') {
     return (
-      <div className="planit-trip">
-        <div className="page creating">
-          <header className="topbar">
-            <div className="title-block">
-              <h1>{safeTitle || '일정 생성중'}</h1>
-              {periodLabel && <p>{periodLabel}</p>}
+      <main className="home-shell">
+        <AppHeader />
+        <div className="planit-trip">
+          <div className="page creating">
+            <header className="topbar">
+              <div className="title-block">
+                <h1>{safeTitle || '일정 생성중'}</h1>
+                {periodLabel && <p>{periodLabel}</p>}
+              </div>
+              <button className="pill-button" onClick={() => navigate('/')}>
+                홈으로
+              </button>
+            </header>
+            <div className="creating-body">
+              <p>여행 일정을 생성 중 입니다.</p>
+              <p>잠시만 기다려 주세요.</p>
+              <div className="dots">••••</div>
             </div>
-            <button className="pill-button" onClick={() => navigate('/')}>
-              홈으로
-            </button>
-          </header>
-          <div className="creating-body">
-            <p>여행 일정을 생성 중 입니다.</p>
-            <p>잠시만 기다려 주세요.</p>
-            <div className="dots">••••</div>
           </div>
         </div>
-      </div>
+      </main>
     )
   }
 
@@ -430,8 +463,10 @@ export default function TripCreatePage() {
     const dayId = typeof rawDayId === 'number' ? rawDayId : Number(rawDayId)
 
     return (
-      <div className="planit-trip">
-        <div className="page schedule">
+      <main className="home-shell">
+        <AppHeader />
+        <div className="planit-trip">
+          <div className="page schedule">
           <header className="schedule-header">
             <div className="title-block">
               <h1>{scheduleTitle}</h1>
@@ -742,24 +777,24 @@ export default function TripCreatePage() {
             </div>
           )}
 
+          </div>
         </div>
-      </div>
+      </main>
     )
   }
 
   return (
-    <div className="planit-trip">
-      <div className="page">
-        <header className="topbar">
-          <button className="icon-button" onClick={handleBack}>
-            ←
-          </button>
-          <h1>여행 정보 입력</h1>
-          <div className="topbar-actions">
-            <button className="pill-button">알림</button>
-            <div className="avatar">U</div>
-          </div>
-        </header>
+    <main className="home-shell">
+      <AppHeader />
+      <div className="planit-trip">
+        <div className="page">
+          <header className="topbar">
+            <button className="icon-button" onClick={handleBack}>
+              ←
+            </button>
+            <h1>여행 정보 입력</h1>
+            <div />
+          </header>
 
         {toast && <div className="toast">{toast}</div>}
 
@@ -890,14 +925,19 @@ export default function TripCreatePage() {
         {showWantedPlaceSection && (
           <section className="section">
             <label>꼭 가보고 싶은 곳이 있나요?</label>
-            <button className="input-button" onClick={() => setShowPlaceModal(true)}>
-              <span className="placeholder">예: 해운대, 성심당, 디즈니랜드...</span>
-            </button>
+            <PlaceSearchPanel
+              key={travelCity}
+              initialDestinationCode={DESTINATION_CODE_BY_LABEL[travelCity] ?? ''}
+              onPlaceSelected={handlePlaceSelected}
+            />
             {wantedPlaces.length > 0 && (
               <div className="place-list">
                 {wantedPlaces.map((place) => (
                   <div key={place.id} className="place-item">
-                    <span>{place.name}</span>
+                    <div>
+                      <strong>{place.name}</strong>
+                      <p className="helper-text">{place.address}</p>
+                    </div>
                     <button className="remove" onClick={() => handleRemovePlace(place.id)}>
                       ✕
                     </button>
@@ -983,52 +1023,6 @@ export default function TripCreatePage() {
           </div>
         )}
 
-        {showWantedPlaceSection && showPlaceModal && (
-          <div className="modal-backdrop" onClick={() => setShowPlaceModal(false)}>
-            <div className="modal" onClick={(event) => event.stopPropagation()}>
-              <header>
-                <h3>장소 선택</h3>
-                <button className="icon-button" onClick={() => setShowPlaceModal(false)}>
-                  ✕
-                </button>
-              </header>
-              <div className="modal-body">
-                <div className="field">
-                  <label>장소를 입력하세요</label>
-                  <div className="place-input-row">
-                    <input
-                      type="text"
-                      placeholder="예: 성심당"
-                      value={placeDraft}
-                      onChange={(event) => setPlaceDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          handleAddPlace()
-                        }
-                      }}
-                    />
-                    <button className="pill-button" onClick={handleAddPlace}>
-                      추가
-                    </button>
-                  </div>
-                </div>
-                {wantedPlaces.length > 0 && (
-                  <div className="place-list">
-                    {wantedPlaces.map((place) => (
-                      <div key={place.id} className="place-item">
-                        <span>{place.name}</span>
-                        <button className="remove" onClick={() => handleRemovePlace(place.id)}>
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {showBackConfirm && (
           <div className="modal-backdrop" onClick={() => setShowBackConfirm(false)}>
@@ -1047,7 +1041,8 @@ export default function TripCreatePage() {
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </main>
   )
 }
