@@ -12,6 +12,7 @@ export interface PostListItem {
   likeCount: number
   commentCount: number
   representativeImageId?: number | null
+  representativeImageUrl?: string | null
   rankingScore?: number | null
   placeName?: string | null
   tripTitle?: string | null
