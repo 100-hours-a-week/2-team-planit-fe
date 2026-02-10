@@ -999,16 +999,32 @@
 }
 
 .post-card__media {
-  height: 120px;
-  background: linear-gradient(135deg, #ffd83f, #f7b731);
+  height: 160px;
+  border-radius: 16px 16px 0 0;
+  position: relative;
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.post-card__media.no-image {
+  background-color: #f4cf54;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.post-card__media.has-image {
+  background-color: #000;
+}
+
+.post-card__placeholder-text {
   font-weight: 700;
+  letter-spacing: 3px;
   color: #111;
+  font-size: 16px;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.9rem;
 }
 
 .post-card__body {

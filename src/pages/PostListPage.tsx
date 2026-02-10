@@ -333,15 +333,26 @@ export default function PostListPage() {
         </p>
       ) : (
         <>
-        <section className="post-grid" aria-live="polite">
+          <section className="post-grid" aria-live="polite">
             {posts.map((post) => (
               <article
                 key={post.postId}
                 className="post-card"
                 onClick={() => navigate(`/posts/${post.postId}`)}
               >
-                <div className="post-card__media">
-                  <span>{post.placeName ?? post.tripTitle ?? 'Planit'}</span>
+                <div
+                  className={`post-card__media ${
+                    post.representativeImageUrl ? 'has-image' : 'no-image'
+                  }`}
+                  style={
+                    post.representativeImageUrl
+                      ? { backgroundImage: `url(${post.representativeImageUrl})` }
+                      : undefined
+                  }
+                >
+                  {!post.representativeImageUrl && (
+                    <span className="post-card__placeholder-text">PLANIT</span>
+                  )}
                 </div>
                 <div className="post-card__body">
                   <div className="post-card__header">
