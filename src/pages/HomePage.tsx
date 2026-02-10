@@ -1,19 +1,11 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
 import { useAuth } from '../store'
+import { getPosts } from '../api/posts'
+import type { PostListItem } from '../api/posts'
 
 type BoardType = '일정 공유' | '장소 추천' | '자유 게시판'
-
-type BoardPost = {
-  postId: number
-  boardType: BoardType
-  title: string
-  content: string
-  likeCount: number
-  commentCount: number
-  createdAt: string
-}
 
 type TravelSeed = {
   id: string
@@ -23,54 +15,6 @@ type TravelSeed = {
 }
 
 const BOARD_TYPES: BoardType[] = ['일정 공유', '장소 추천', '자유 게시판']
-
-const BOARD_POSTS: BoardPost[] = [
-  {
-    postId: 401,
-    boardType: '자유 게시판',
-    title: '한라산이 보여준 겨울의 시간표',
-    content: '산행 루트부터 온천, 숙소까지 하루 스케줄을 공유합니다',
-    likeCount: 1280,
-    commentCount: 62,
-    createdAt: '2026-01-30T09:10:00.000Z',
-  },
-  {
-    postId: 402,
-    boardType: '자유 게시판',
-    title: '강릉 커피 기행 후기',
-    content: '기차를 타고 내려가는 동안 커피집 5곳을 돌았어요.',
-    likeCount: 860,
-    commentCount: 14,
-    createdAt: '2026-01-29T15:23:00.000Z',
-  },
-  {
-    postId: 403,
-    boardType: '자유 게시판',
-    title: '서울 근교 캠핑 조합',
-    content: '데이트, 가족, 친구별로 추천하는 캠핑장 리스트입니다.',
-    likeCount: 430,
-    commentCount: 9,
-    createdAt: '2026-01-28T21:40:00.000Z',
-  },
-  {
-    postId: 404,
-    boardType: '자유 게시판',
-    title: '한강 피크닉 장비',
-    content: '돗자리부터 전기버너까지 실물 후기 남겨요.',
-    likeCount: 1080,
-    commentCount: 22,
-    createdAt: '2026-01-27T18:10:00.000Z',
-  },
-  {
-    postId: 405,
-    boardType: '자유 게시판',
-    title: '간사이 3박4일 기록',
-    content: '지하철 패스, 식사, 쇼핑 포인트를 시간대 별로 정리했습니다.',
-    likeCount: 980,
-    commentCount: 31,
-    createdAt: '2026-01-26T11:05:00.000Z',
-  },
-]
 
 const LOGIN_TOAST_MESSAGE = '로그인 후 이용 가능한 서비스입니다.'
 const BOARD_UNSUPPORTED_TOAST = 'v1에서는 자유 게시판만 지원합니다.'
@@ -242,14 +186,50 @@ export default function HomePage() {
     navigate(`/posts/${postId}`)
   }
 
-  const sortedBoardPosts = useMemo(() => {
-    return [...BOARD_POSTS]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .filter((post) => post.boardType === selectedBoardType)
-      .slice(0, 3)
-  }, [selectedBoardType])
+  const RECENT_POST_PARAMS = {
+    sort: 'latest' as const,
+    page: 0,
+    size: 3,
+  }
 
   const recommendations = useMemo(() => shuffle(TRAVEL_RECOMMENDATIONS).slice(0, 5), [])
+  const [recentPosts, setRecentPosts] = useState<PostListItem[]>([])
+  const [isRecentLoading, setIsRecentLoading] = useState(true)
+  const [recentFetchFailed, setRecentFetchFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchRecentPosts = async () => {
+      setIsRecentLoading(true)
+      setRecentFetchFailed(false)
+      try {
+        const response = await getPosts({
+          ...RECENT_POST_PARAMS,
+          boardType: selectedBoardType,
+        })
+        if (cancelled) {
+          return
+        }
+        setRecentPosts(response.posts)
+      } catch {
+        if (cancelled) {
+          return
+        }
+        setRecentPosts([])
+        setRecentFetchFailed(true)
+      } finally {
+        if (!cancelled) {
+          setIsRecentLoading(false)
+        }
+      }
+    }
+
+    fetchRecentPosts()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedBoardType])
 
   return (
     <main className="home-shell">
@@ -294,31 +274,39 @@ export default function HomePage() {
             ))}
           </div>
           <div className="board-list">
-            {sortedBoardPosts.map((post) => (
-              <article
-                key={post.postId}
-                className="board-card"
-                role="button"
-                tabIndex={0}
-                onClick={() => handlePostClick(post.postId)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    handlePostClick(post.postId)
-                  }
-                }}
-              >
-                <div className="board-card-header">
-                  <span className="board-tag">{post.boardType}</span>
-                  <span className="board-date">{formatTimeAgo(post.createdAt)}</span>
-                </div>
-                <h4>{truncateText(post.title, 11)}</h4>
-                <p>{truncateText(post.content, 15)}</p>
-                <div className="board-meta">
-                  <span>좋아요 {formatCount(post.likeCount)}</span>
-                  <span>댓글 {formatCount(post.commentCount)}</span>
-                </div>
-              </article>
-            ))}
+            {isRecentLoading ? (
+              <p className="board-status">게시물을 불러오는 중입니다...</p>
+            ) : recentPosts.length > 0 ? (
+              recentPosts.map((post) => (
+                <article
+                  key={post.postId}
+                  className="board-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handlePostClick(post.postId)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      handlePostClick(post.postId)
+                    }
+                  }}
+                >
+                  <div className="board-card-header">
+                    <span className="board-tag">{selectedBoardType}</span>
+                    <span className="board-date">{formatTimeAgo(post.createdAt)}</span>
+                  </div>
+                  <h4>{truncateText(post.title, 11)}</h4>
+                  <p>{truncateText(post.placeName ?? post.tripTitle ?? 'PlanIt 커뮤니티', 20)}</p>
+                  <div className="board-meta">
+                    <span>좋아요 {formatCount(post.likeCount)}</span>
+                    <span>댓글 {formatCount(post.commentCount)}</span>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="board-status">
+                {recentFetchFailed ? '게시물을 불러오지 못했습니다.' : '게시물이 없습니다.'}
+              </p>
+            )}
           </div>
           <div className="board-footer">
             <button type="button" className="text-link" onClick={handleViewAll}>
