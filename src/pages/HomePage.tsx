@@ -91,6 +91,12 @@ const shuffle = <T,>(list: T[]): T[] => {
   return copy
 }
 
+const RECENT_POST_PARAMS = {
+  sort: 'latest' as const,
+  page: 0,
+  size: 3,
+}
+
 const formatCount = (value: number) => {
   if (value >= 10000) {
     return `${Math.floor(value / 1000)}0k`
@@ -184,12 +190,6 @@ export default function HomePage() {
       return
     }
     navigate(`/posts/${postId}`)
-  }
-
-  const RECENT_POST_PARAMS = {
-    sort: 'latest' as const,
-    page: 0,
-    size: 3,
   }
 
   const recommendations = useMemo(() => shuffle(TRAVEL_RECOMMENDATIONS).slice(0, 5), [])
