@@ -31,10 +31,7 @@ const formatTimeAgo = (value: string) => {
     return ''
   }
   const diffMinutes = Math.max(Math.floor((Date.now() - timestamp) / 60000), 1)
-  if (diffMinutes < 60) {
-    return `${diffMinutes}분 전`
-  }
-  const diffHours = Math.floor(diffMinutes / 60)
+  const diffHours = Math.max(Math.floor(diffMinutes / 60), 1)
   if (diffHours < 24) {
     return `${diffHours}시간 전`
   }
@@ -297,24 +294,25 @@ export default function NotificationPage() {
       ) : (
         <section className="notification-list" aria-live="polite">
           {notifications.map((notification) => (
-            <article
-              key={notification.notificationId}
-              className={`notification-card${notification.isRead ? '' : ' notification-card--unread'}`}
-              onClick={() => handleNotificationClick(notification)}
-            >
-              <div className="notification-card__header">
-                <span className="notification-card__badge">{getTypeBadge(notification.type)}</span>
-                <div>
-                  <p className="notification-card__type">
-                    {notification.actorName ? `${notification.actorName} · ` : ''}
-                    {TYPE_LABELS[notification.type]} 알림
-                  </p>
-                  <p className="notification-card__timestamp">{formatTimeAgo(notification.createdAt)}</p>
-                </div>
+          <article
+            key={notification.notificationId}
+            className={`notification-card${notification.isRead ? '' : ' notification-card--unread'}`}
+            onClick={() => handleNotificationClick(notification)}
+          >
+            <div className="notification-card__header">
+              <span className="notification-card__badge">{getTypeBadge(notification.type)}</span>
+              <div>
+                <p className="notification-card__type">
+                  {notification.actorName ? `${notification.actorName} · ` : ''}
+                  {TYPE_LABELS[notification.type]} 알림
+                </p>
+                <p className="notification-card__timestamp">{formatTimeAgo(notification.createdAt)}</p>
               </div>
-                  <p className="notification-card__text">{getNotificationMessage(notification)}</p>
-              {!notification.isRead && <span className="notification-card__unread-pill">새 알림</span>}
-            </article>
+            </div>
+            <p className="notification-card__content">“{notification.previewText}”</p>
+            <p className="notification-card__text">{getNotificationMessage(notification)}</p>
+            {!notification.isRead && <span className="notification-card__unread-pill">새 알림</span>}
+          </article>
           ))}
           <div ref={sentinelRef} className="notification-sentinel" aria-hidden="true" />
         </section>

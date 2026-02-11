@@ -13,22 +13,22 @@ export default function AppHeader() {
   const profileAvatarSrc = resolveImageUrl(user?.profileImageUrl, DEFAULT_AVATAR_URL)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
+  const [notificationCount, setNotificationCount] = useState(0)
 
   const fetchNotificationCount = useCallback(
     async (isCancelled: () => boolean = () => false) => {
       if (!loggedIn) {
-        setHasUnreadNotification(false)
+        setNotificationCount(0)
         return
       }
       try {
         const result = await getMyPage()
         if (!isCancelled()) {
-          setHasUnreadNotification(result.notificationCount > 0)
+          setNotificationCount(result.notificationCount ?? 0)
         }
       } catch {
         if (!isCancelled()) {
-          setHasUnreadNotification(false)
+          setNotificationCount(0)
         }
       }
     },
@@ -38,7 +38,7 @@ export default function AppHeader() {
   useEffect(() => {
     if (!loggedIn) {
       const timer = window.setTimeout(() => {
-        setHasUnreadNotification(false)
+        setNotificationCount(0)
       }, 0)
       return () => {
         window.clearTimeout(timer)
@@ -61,7 +61,7 @@ export default function AppHeader() {
         fetchNotificationCount()
         return
       }
-      setHasUnreadNotification(detail.count > 0)
+      setNotificationCount(detail.count ?? 0)
     }
     window.addEventListener('notifications:unread-count', handleUnreadBadgeUpdate)
     return () => {
@@ -90,10 +90,14 @@ export default function AppHeader() {
 
   const handleLogout = () => {
     clearAuth()
-    setHasUnreadNotification(false)
+    setNotificationCount(0)
     setDropdownOpen(false)
     navigate('/login')
   }
+
+  const hasUnreadNotification = notificationCount > 0
+  const notificationLabel =
+    hasUnreadNotification && (notificationCount > 99 ? '99+' : `${notificationCount}`)
 
   return (
     <header className="app-header">
@@ -106,7 +110,11 @@ export default function AppHeader() {
         <button type="button" className="notification-button" onClick={handleNotificationClick}>
           <span className="sr-only">알림함</span>
           <span aria-hidden="true">🔔</span>
-          {hasUnreadNotification && <span className="notification-dot" aria-hidden="true" />}
+          {notificationLabel && (
+            <span className="notification-count" aria-hidden="true">
+              {notificationLabel}
+            </span>
+          )}
         </button>
         <div className="profile-wrapper">
           <button

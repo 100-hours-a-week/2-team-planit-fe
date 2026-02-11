@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AuthPageHeader from '../components/AuthPageHeader'
@@ -15,6 +15,13 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
+  const hasLoginIdValue = loginId.length > 0
+  const isLoginIdValidFormat = /^[a-z0-9_]{1,20}$/.test(loginId)
+  const isLoginIdTooShort = hasLoginIdValue && loginId.length < 4
+  const isLoginIdTooLong = loginId.length > 20
+  const containsSpaceOrNewLine = /\s/.test(loginId)
+  const containsInvalidChar = /[^a-z0-9_]/.test(loginId)
+
   const loginIdError = loginIdTouched && loginId.length === 0 ? '*아이디를 입력해주세요.' : ''
 
   const passwordError = passwordTouched
@@ -23,7 +30,23 @@ export default function LoginPage() {
       : ''
     : ''
 
-  const isFormValid = loginIdError === '' && passwordError === '' && loginId.length > 0 && password.length > 0
+  const loginIdFormatError =
+    loginIdTouched &&
+    hasLoginIdValue &&
+    (isLoginIdTooShort ||
+      isLoginIdTooLong ||
+      containsSpaceOrNewLine ||
+      containsInvalidChar ||
+      !isLoginIdValidFormat)
+      ? '*아이디 또는 비밀번호가 잘못 되었습니다. 아이디와 비밀번호를 정확히 입력해 주세요.'
+      : ''
+
+  const isFormValid =
+    loginIdError === '' &&
+    passwordError === '' &&
+    hasLoginIdValue &&
+    password.length > 0 &&
+    loginIdFormatError === ''
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -47,10 +70,26 @@ export default function LoginPage() {
       setAuth({ user: userPayload, accessToken: data.accessToken })
       navigate('/')
     } catch {
-      setErrorMessage('*아이디 또는 비밀번호를 확인해주세요.')
-    } finally {
-      setIsSubmitting(false)
+    if (!hasLoginIdValue) {
+      setErrorMessage('*아이디를 입력해주세요.')
+    } else if (!isLoginIdValidFormat) {
+      setErrorMessage('*아이디 또는 비밀번호가 잘못 되었습니다. 아이디와 비밀번호를 정확히 입력해 주세요.')
+    } else if (password.length === 0) {
+      setErrorMessage('*비밀번호를 입력해주세요.')
+    } else {
+      if (!hasLoginIdValue) {
+        setErrorMessage('*아이디를 입력해주세요.')
+      } else if (password.length === 0) {
+        setErrorMessage('*비밀번호를 입력해주세요.')
+      } else if (isLoginIdTooShort || isLoginIdTooLong || containsSpaceOrNewLine || containsInvalidChar) {
+        setErrorMessage('*아이디 또는 비밀번호가 잘못 되었습니다. 아이디와 비밀번호를 정확히 입력해 주세요.')
+      } else {
+        setErrorMessage('*아이디 또는 비밀번호를 확인해주세요.')
+      }
     }
+  } finally {
+    setIsSubmitting(false)
+  }
   }
 
   return (
@@ -78,7 +117,9 @@ export default function LoginPage() {
               placeholder="아이디를 입력해주세요"
               autoComplete="username"
             />
-            {loginIdError && <p className="error-text">{loginIdError}</p>}
+            {(loginIdError || loginIdFormatError) && (
+              <p className="error-text">{loginIdError || loginIdFormatError}</p>
+            )}
           </div>
 
           <div className="form-group">
@@ -102,7 +143,11 @@ export default function LoginPage() {
 
           {errorMessage && <p className="error-text">{errorMessage}</p>}
 
-          <button className="primary-btn" type="submit" disabled={!isFormValid || isSubmitting}>
+          <button
+            className={`primary-btn ${isFormValid ? 'active' : ''}`}
+            type="submit"
+            disabled={!isFormValid || isSubmitting}
+          >
             {isSubmitting ? '로그인 중…' : '로그인'}
           </button>
         </form>

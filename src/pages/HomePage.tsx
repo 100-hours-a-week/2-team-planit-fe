@@ -128,7 +128,7 @@ export default function HomePage() {
   const { user } = useAuth()
   const loggedIn = Boolean(user)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
-  const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('자유 게시판')
+  const [selectedBoardType, setSelectedBoardType] = useState<BoardType>('일정 공유')
   const toastKeyRef = useRef(0)
 
   const showToast = (message: string) => {
@@ -173,14 +173,10 @@ export default function HomePage() {
       showLoginToast()
       return
     }
-    navigate('/posts')
+    navigate(`/posts?boardType=${encodeURIComponent(selectedBoardType)}`)
   }
 
   const handleBoardTypeClick = (type: BoardType) => {
-    if (type !== '자유 게시판') {
-      showUnsupportedToast()
-      return
-    }
     setSelectedBoardType(type)
   }
 

@@ -10,6 +10,16 @@ import { useAuth } from '../store'
 import { createPortal } from 'react-dom'
 
 const BOARD_TYPES = ['자유 게시판', '일정 공유', '장소 추천'] as const
+const DEFAULT_BOARD_TYPE: BoardType = '자유 게시판'
+
+const getBoardTypeFromQuery = (search: string): BoardType => {
+  const params = new URLSearchParams(search)
+  const type = params.get('boardType')
+  if (type && BOARD_TYPES.includes(type as BoardType)) {
+    return type as BoardType
+  }
+  return DEFAULT_BOARD_TYPE
+}
 const PAGE_SIZE = 10
 
 const SORT_OPTIONS: { label: string; value: SortParam }[] = [
@@ -64,7 +74,7 @@ export default function PostListPage() {
   const location = useLocation()
   const { user } = useAuth()
   const [posts, setPosts] = useState<PostListItem[]>([])
-  const [boardType, setBoardType] = useState<BoardType>(BOARD_TYPES[0])
+  const [boardType, setBoardType] = useState<BoardType>(() => getBoardTypeFromQuery(location.search))
   const [sortOption, setSortOption] = useState<SortParam>('latest')
   const [searchTerm, setSearchTerm] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -233,6 +243,13 @@ export default function PostListPage() {
     }
     setBoardType(type)
   }
+
+  useEffect(() => {
+    const nextBoardType = getBoardTypeFromQuery(location.search)
+    if (nextBoardType !== boardType) {
+      setBoardType(nextBoardType)
+    }
+  }, [location.search, boardType])
 
   const handleWritePost = () => {
     if (!user) {
