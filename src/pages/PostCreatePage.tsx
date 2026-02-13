@@ -117,6 +117,7 @@ export default function PostCreatePage() {
     setIsSubmitting(true)
     try {
       const result = await createPost({
+        boardType,
         title: title.trim(),
         content: content.trim(),
         imageKeys: imageKeys.length > 0 ? imageKeys : undefined,

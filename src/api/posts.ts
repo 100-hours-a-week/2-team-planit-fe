@@ -72,6 +72,7 @@ export interface CreateCommentPayload {
 export interface CreatePostPayload {
   title: string
   content: string
+  boardType: string
   imageKeys?: string[]
 }
 
