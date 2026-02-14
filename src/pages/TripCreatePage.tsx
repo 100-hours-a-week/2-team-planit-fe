@@ -64,6 +64,12 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 })
 const CREATE_ALLOWED_START_HOUR = 14
 const CREATE_ALLOWED_END_HOUR = 2
+const BYPASS_CREATE_TIME_LIMIT = (() => {
+  const value = (import.meta.env.VITE_BYPASS_TRIP_CREATE_TIME_LIMIT as string | undefined)
+    ?.trim()
+    .toLowerCase()
+  return value === 'true' || value === '1' || value === 'yes' || value === 'y'
+})()
 
 const DESTINATION_CODE_BY_LABEL: Record<string, string> = {
   '가오슝, 대만': 'KAOHSIUNG_TW',
@@ -214,6 +220,7 @@ export default function TripCreatePage() {
   const requiredReady =
     title.trim().length > 0 &&
     travelCity &&
+    Boolean(DESTINATION_CODE_BY_LABEL[travelCity]) &&
     arrivalDate &&
     departureDate &&
     arrivalHour !== '' &&
@@ -222,8 +229,9 @@ export default function TripCreatePage() {
     themes.length > 0
 
   const currentHour = currentTime.getHours()
-  const isCreateWindowOpen =
+  const isCreateWindowOpenByTime =
     currentHour >= CREATE_ALLOWED_START_HOUR || currentHour < CREATE_ALLOWED_END_HOUR
+  const isCreateWindowOpen = BYPASS_CREATE_TIME_LIMIT || isCreateWindowOpenByTime
 
   const isDirty =
     title ||
@@ -299,6 +307,11 @@ export default function TripCreatePage() {
     setSubmitState({ loading: false, error: '' })
 
     if (!requiredReady) return
+    const destinationCode = DESTINATION_CODE_BY_LABEL[travelCity]
+    if (!destinationCode) {
+      setSubmitState({ loading: false, error: '여행지 코드 매핑에 실패했습니다. 여행지를 다시 선택해주세요.' })
+      return
+    }
 
     const payload = {
       title: title.trim(),
@@ -307,6 +320,7 @@ export default function TripCreatePage() {
       departureDate,
       departureTime: String(departureHour).padStart(2, '0') + ':00',
       travelCity,
+      destinationCode,
       totalBudget: budgetValue,
       travelTheme: themes,
       wantedPlace: wantedPlaces.map((place) => place.googlePlaceId),
@@ -957,8 +971,11 @@ export default function TripCreatePage() {
           >
             입력 완료 &amp; 대기방 입장 →
           </button>
-          {!isCreateWindowOpen && (
+          {!isCreateWindowOpenByTime && !BYPASS_CREATE_TIME_LIMIT && (
             <div className="helper warning">※ 일정 생성은 14:00~02:00에만 가능합니다.</div>
+          )}
+          {travelCity && !DESTINATION_CODE_BY_LABEL[travelCity] && (
+            <div className="helper warning">※ 선택한 여행지의 destinationCode 매핑이 없습니다.</div>
           )}
           {!requiredReady && <div className="helper warning">※ 필수 입력 항목(*)을 모두 입력해주세요.</div>}
           {submitState.error && <div className="helper warning">{submitState.error}</div>}

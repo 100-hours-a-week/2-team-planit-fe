@@ -13,7 +13,6 @@ import {
   deleteProfileImage,
   type MyPageResponse,
 } from '../api/users'
-import { deletePlan, fetchPlans } from '../api/plans'
 import { deleteTrip, fetchTrips, type TripListItem } from '../api/trips'
 import { useAuth, type User } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
@@ -23,14 +22,6 @@ const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}
 const LOGIN_HELPER = '아이디는 영문 소문자와 숫자, _ 만 사용이 가능함'
 const NICKNAME_HELPER = '*닉네임은 공백 없이 최대 10자까지 입력할 수 있으며, 이모지는 사용할 수 없습니다.'
 const emojiRegex = /\p{Emoji}/u
-
-type PlanItem = {
-  id: number
-  title: string
-  status: string
-  boardType: string
-  leader?: boolean
-}
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (typeof error === 'object' && error !== null) {
@@ -60,12 +51,9 @@ export default function MyPage() {
   const { user, accessToken, setAuth, clearAuth } = useAuth()
   const authUser = user
   const [pageStats, setPageStats] = useState<MyPageResponse | null>(null)
-  const [plans, setPlans] = useState<PlanItem[]>([])
   const [trips, setTrips] = useState<TripListItem[]>([])
   const [tripsLoading, setTripsLoading] = useState(false)
   const [tripError, setTripError] = useState('')
-  const [planError, setPlanError] = useState('')
-  const [rowsLoading, setRowsLoading] = useState(true)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
@@ -79,8 +67,6 @@ export default function MyPage() {
   const [nicknameError, setNicknameError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [passwordConfirmError, setPasswordConfirmError] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<PlanItem | null>(null)
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -132,9 +118,6 @@ export default function MyPage() {
   }
 
   const planList = useMemo(() => {
-    if (plans.length > 0) {
-      return plans
-    }
     if (!pageStats) {
       return []
     }
@@ -145,7 +128,7 @@ export default function MyPage() {
       boardType: preview.boardType,
       leader: false,
     }))
-  }, [plans, pageStats])
+  }, [pageStats])
 
   useEffect(() => {
     let cancelled = false
@@ -185,48 +168,6 @@ export default function MyPage() {
         }
       })
 
-    return () => {
-      cancelled = true
-    }
-  }, [authUser])
-
-  useEffect(() => {
-    let cancelled = false
-    if (!authUser) {
-      setPlans([])
-      setPlanError('')
-      setRowsLoading(false)
-      return () => {
-        cancelled = true
-      }
-    }
-    setRowsLoading(true)
-    setPlanError('')
-    fetchPlans()
-      .then((list) => {
-        if (cancelled) {
-          return
-        }
-        setPlans(
-          list.map((plan) => ({
-            id: plan.planId,
-            title: plan.title,
-            status: plan.status,
-            boardType: plan.boardType,
-            leader: plan.leader,
-          })),
-        )
-      })
-      .catch((fetchError: unknown) => {
-        if (!cancelled) {
-          setPlanError(getErrorMessage(fetchError, '*내 계획을 불러오지 못했습니다.'))
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setRowsLoading(false)
-        }
-      })
     return () => {
       cancelled = true
     }
@@ -478,24 +419,6 @@ export default function MyPage() {
     setPasswordConfirmError(null)
     setNicknameChecked(initialNickname === authUser?.nickname)
   }
-
-  const handlePlanDelete = async () => {
-    if (!deleteTarget) {
-      return
-    }
-    try {
-      await deletePlan(deleteTarget.id)
-      setPlans((prev) => prev.filter((plan) => plan.id !== deleteTarget.id))
-      setToastMessage('*삭제 완료')
-    } catch (error: unknown) {
-      const message = getErrorMessage(error, '삭제에 실패했습니다.')
-      setPlanError(message)
-    } finally {
-      setDeleteModalOpen(false)
-      setDeleteTarget(null)
-    }
-  }
-
 
 {/*
   const handleLoadTrips = async () => {
@@ -784,50 +707,9 @@ export default function MyPage() {
               </article>
             ))}
           </div>
-          {planError && <p className="error-text">{planError}</p>}
-          {planList.length === 0 && !rowsLoading && (
+          {planList.length === 0 && (
             <p className="helper-text helper-fixed">*아직 생성된 계획이 없습니다.</p>
           )}
-          {/*}
-          <div className="plan-list">
-            {planList.map((plan) => (
-              <article
-                key={plan.id}
-                className="plan-card"
-                onClick={() => navigate(`/plans/${plan.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    navigate(`/plans/${plan.id}`)
-                  }
-                }}
-              >
-                <div>
-                  <strong>{plan.title}</strong>
-                  <p className="plan-meta">
-                    {plan.boardType}
-                    <span className="dot" />
-                    {plan.status}
-                  </p>
-                </div>
-                {plan.leader && (
-                  <button
-                    type="button"
-                    className="plan-card-delete"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setDeleteTarget(plan)
-                      setDeleteModalOpen(true)
-                    }}
-                  >
-                    삭제
-                  </button>
-                )}
-              </article>
-            ))}
-          </div>
-            */}
         </section>
 
         <div className="danger-zone">
@@ -835,16 +717,6 @@ export default function MyPage() {
             탈퇴하기
           </button>
         </div>
-
-        <Modal
-          open={deleteModalOpen}
-          title="일정 삭제"
-          message="해당 일정을 삭제하시겠습니까?"
-          confirmLabel="삭제"
-          danger
-          onConfirm={handlePlanDelete}
-          onCancel={() => setDeleteModalOpen(false)}
-        />
 
         <Modal
           open={withdrawModalOpen}

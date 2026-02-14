@@ -52,6 +52,7 @@ export type CreateTripPayload = {
   departureDate: string
   departureTime: string
   travelCity: string
+  destinationCode: string
   totalBudget: number
   travelTheme: string[]
   wantedPlace: string[]
