@@ -91,8 +91,10 @@ export interface PresignedUrlResponse {
 const BASE_PATH = '/posts'
 
 export interface PostListResponse {
-  posts: PostListItem[]
-  hasMore: boolean
+  items: PostListItem[]
+  hasNext?: boolean
+  page?: number
+  size?: number
 }
 
 export interface GetPostsParams {

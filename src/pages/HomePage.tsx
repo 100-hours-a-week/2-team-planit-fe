@@ -211,7 +211,7 @@ export default function HomePage() {
         if (cancelled) {
           return
         }
-        setRecentPosts(response.posts)
+        setRecentPosts(response.items ?? [])
       } catch {
         if (cancelled) {
           return
