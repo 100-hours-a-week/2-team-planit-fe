@@ -10,6 +10,11 @@ import { useAuth } from '../store'
 import { createPortal } from 'react-dom'
 
 const BOARD_TYPES = ['자유 게시판', '일정 공유', '장소 추천'] as const
+const BOARD_TYPE_PARAM_MAP: Record<BoardType, string> = {
+  '자유 게시판': 'FREE',
+  '일정 공유': 'PLAN_SHARE',
+  '장소 추천': 'PLACE_RECOMMEND',
+}
 const PAGE_SIZE = 10
 
 const SORT_OPTIONS: { label: string; value: SortParam }[] = [
@@ -118,7 +123,7 @@ export default function PostListPage() {
 
       try {
         const response = await getPosts({
-          boardType,
+          boardType: BOARD_TYPE_PARAM_MAP[boardType],
           sort: sortOption,
           search: searchQuery || undefined,
           page,
@@ -224,13 +229,6 @@ export default function PostListPage() {
   }
 
   const handleBoardTabClick = (type: BoardType) => {
-    if (type !== '자유 게시판') {
-      showToast('v1 미구현 기능')
-      reloadTimeout.current = window.setTimeout(() => {
-        window.location.reload()
-      }, 1800)
-      return
-    }
     setBoardType(type)
   }
 
