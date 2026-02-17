@@ -127,8 +127,8 @@ export default function PostListPage() {
         if (cancelled) {
           return
         }
-        setPosts((prev) => (page === 0 ? response.posts : [...prev, ...response.posts]))
-        setHasMore(response.hasMore)
+        setPosts((prev) => (page === 0 ? response.items : [...prev, ...response.items]))
+        setHasMore(Boolean(response.hasNext))
       } catch {
         if (cancelled) {
           return
