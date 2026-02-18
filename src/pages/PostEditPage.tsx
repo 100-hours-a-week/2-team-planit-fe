@@ -124,7 +124,6 @@ export default function PostEditPage() {
       try {
         const ext = getFileExtension(file)
         const { uploadUrl, key } = await getPostPresignedUrl(ext, file.type || 'image/jpeg')
-        // Presigned URL은 PUT용. redirect를 따르면 브라우저가 GET으로 바꿔 서명 불일치(403)가 난다.
         const response = await fetch(uploadUrl, {
           method: 'PUT',
           body: await file.arrayBuffer(),

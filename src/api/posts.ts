@@ -72,14 +72,23 @@ export interface CreateCommentPayload {
 export interface CreatePostPayload {
   title: string
   content: string
-  boardType: string
   imageKeys?: string[]
+  boardType: string
+  planId?: number
+  placeName?: string
+  rating?: number
+  googlePlaceId?: string
 }
 
 export interface UpdatePostPayload {
   title?: string
   content?: string
   imageKeys?: string[]
+  boardType?: string
+  planId?: number
+  placeName?: string
+  rating?: number
+  googlePlaceId?: string
 }
 
 export interface PresignedUrlResponse {
@@ -103,6 +112,7 @@ export interface GetPostsParams {
   sort?: SortParam
   page?: number
   size?: number
+  city?: string
 }
 
 export async function getPosts(params?: GetPostsParams): Promise<PostListResponse> {

@@ -177,10 +177,6 @@ export default function HomePage() {
   }
 
   const handleBoardTypeClick = (type: BoardType) => {
-    if (type !== '자유 게시판') {
-      showUnsupportedToast()
-      return
-    }
     setSelectedBoardType(type)
   }
 
