@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
@@ -15,6 +15,110 @@ const BOARD_TYPE_PARAM_MAP: Record<BoardType, string> = {
   '일정 공유': 'PLAN_SHARE',
   '장소 추천': 'PLACE_RECOMMEND',
 }
+
+const CITY_CATEGORIES = [
+  {
+    country: 'taiwan',
+    label: '대만',
+    cities: [
+      { label: '타이베이', value: 'Taipei' },
+      { label: '가오슝', value: 'Kaohsiung' },
+    ],
+  },
+  {
+    country: 'usa',
+    label: '미국',
+    cities: [
+      { label: '괌', value: 'Guam' },
+      { label: '사이판', value: 'Saipan' },
+    ],
+  },
+  {
+    country: 'japan',
+    label: '일본',
+    cities: [
+      { label: '도쿄', value: 'Tokyo' },
+      { label: '오사카', value: 'Osaka' },
+      { label: '삿포로', value: 'Sapporo' },
+      { label: '오키나와', value: 'Okinawa' },
+      { label: '후쿠오카', value: 'Fukuoka' },
+      { label: '나고야', value: 'Nagoya' },
+    ],
+  },
+  {
+    country: 'vietnam',
+    label: '베트남',
+    cities: [
+      { label: '하노이', value: 'Hanoi' },
+      { label: '다낭', value: 'Da Nang' },
+      { label: '나트랑', value: 'Nha Trang' },
+      { label: '푸꾸옥', value: 'Phu Quoc' },
+    ],
+  },
+  {
+    country: 'italy',
+    label: '이탈리아',
+    cities: [{ label: '로마', value: 'Rome' }],
+  },
+  {
+    country: 'uk',
+    label: '영국',
+    cities: [{ label: '런던', value: 'London' }],
+  },
+  {
+    country: 'philippines',
+    label: '필리핀',
+    cities: [
+      { label: '마닐라', value: 'Manila' },
+      { label: '세부', value: 'Cebu' },
+      { label: '보라카이', value: 'Boracay' },
+      { label: '보홀', value: 'Bohol' },
+    ],
+  },
+  {
+    country: 'china',
+    label: '중국',
+    cities: [
+      { label: '홍콩', value: 'Hong Kong' },
+      { label: '상하이', value: 'Shanghai' },
+      { label: '마카오', value: 'Macau' },
+    ],
+  },
+  {
+    country: 'spain',
+    label: '스페인',
+    cities: [{ label: '바르셀로나', value: 'Barcelona' }],
+  },
+  {
+    country: 'thailand',
+    label: '태국',
+    cities: [
+      { label: '방콕', value: 'Bangkok' },
+      { label: '치앙마이', value: 'Chiang Mai' },
+    ],
+  },
+  {
+    country: 'malaysia',
+    label: '말레이시아',
+    cities: [
+      { label: '코타키나발루', value: 'Kota Kinabalu' },
+      { label: '쿠알라룸푸르', value: 'Kuala Lumpur' },
+    ],
+  },
+  {
+    country: 'singapore',
+    label: '싱가포르',
+    cities: [{ label: '싱가포르', value: 'Singapore' }],
+  },
+  {
+    country: 'france',
+    label: '프랑스',
+    cities: [{ label: '파리', value: 'Paris' }],
+  },
+] as const
+
+type CityOption = (typeof CITY_CATEGORIES)[number]['cities'][number]
+type CountryKey = (typeof CITY_CATEGORIES)[number]['country']
 const PAGE_SIZE = 10
 
 const SORT_OPTIONS: { label: string; value: SortParam }[] = [
@@ -83,18 +187,22 @@ export default function PostListPage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const reloadTimeout = useRef<number | null>(null)
   const navigateTimeout = useRef<number | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<CountryKey | ''>('')
+  const [selectedCity, setSelectedCity] = useState('')
 
   const showToast = (message: string) => {
     setToastInfo({ message, key: Date.now() })
   }
 
   useEffect(() => {
+    const currentReload = reloadTimeout.current
+    const currentNavigate = navigateTimeout.current
     return () => {
-      if (reloadTimeout.current) {
-        window.clearTimeout(reloadTimeout.current)
+      if (currentReload) {
+        window.clearTimeout(currentReload)
       }
-      if (navigateTimeout.current) {
-        window.clearTimeout(navigateTimeout.current)
+      if (currentNavigate) {
+        window.clearTimeout(currentNavigate)
       }
     }
   }, [])
@@ -108,7 +216,7 @@ export default function PostListPage() {
     setHasMore(false)
     setError('')
     setPage(0)
-  }, [boardType, sortOption, searchQuery, location.key])
+  }, [boardType, sortOption, searchQuery, selectedCity, location.key])
 
   useEffect(() => {
     let cancelled = false
@@ -122,10 +230,12 @@ export default function PostListPage() {
       }
 
       try {
+        const cityFilter = boardType === '장소 추천' ? selectedCity || undefined : undefined
         const response = await getPosts({
           boardType: BOARD_TYPE_PARAM_MAP[boardType],
           sort: sortOption,
           search: searchQuery || undefined,
+          city: cityFilter,
           page,
           size: PAGE_SIZE,
         })
@@ -154,7 +264,7 @@ export default function PostListPage() {
     return () => {
       cancelled = true
     }
-  }, [boardType, sortOption, searchQuery, page, location.key])
+  }, [boardType, sortOption, searchQuery, page, selectedCity, location.key])
 
   useEffect(() => {
     if (!hasMore || isLoading || isLoadingMore) {
@@ -232,6 +342,26 @@ export default function PostListPage() {
     setBoardType(type)
   }
 
+  const currentCityOptions: readonly CityOption[] = selectedCountry
+    ? CITY_CATEGORIES.find((entry) => entry.country === selectedCountry)?.cities ?? []
+    : []
+
+  const handleCountryChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedCountry(event.target.value as CountryKey | '')
+    setSelectedCity('')
+  }
+
+  const handleCityChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedCity(event.target.value)
+  }
+
+  useEffect(() => {
+    if (boardType !== '장소 추천') {
+      setSelectedCountry('')
+      setSelectedCity('')
+    }
+  }, [boardType])
+
   const handleWritePost = () => {
     if (!user) {
       showToast('로그인이 필요합니다')
@@ -247,8 +377,39 @@ export default function PostListPage() {
     navigate('/home')
   }
 
+  const normalized = (value?: string | null) => value?.toLowerCase() ?? ''
+  const filteredPosts = useMemo(() => {
+    if (boardType !== '장소 추천') {
+      return posts
+    }
+    if (!selectedCountry && !selectedCity) {
+      return posts
+    }
+    const normalizedCity = selectedCity ? selectedCity.toLowerCase() : ''
+    const countryCityValues = CITY_CATEGORIES.find((entry) => entry.country === selectedCountry)?.cities.map((city) =>
+      city.value.toLowerCase(),
+    )
+    return posts.filter((post) => {
+      const placeName = normalized(post.placeName)
+      if (selectedCity) {
+        return placeName.includes(normalizedCity)
+      }
+      if (countryCityValues && countryCityValues.length) {
+        return countryCityValues.some((cityValue) => placeName.includes(cityValue))
+      }
+      return true
+    })
+  }, [posts, boardType, selectedCountry, selectedCity])
+
   const isSearchActive = Boolean(searchQuery)
-  const hasPosts = posts.length > 0
+  const hasFetchedPosts = posts.length > 0
+  const hasDisplayedPosts = filteredPosts.length > 0
+  const hasLocationFilter = boardType === '장소 추천' && (selectedCountry || selectedCity)
+  const emptyMessage = hasLocationFilter
+    ? '선택한 여행지 카테고리에 맞는 게시물이 없습니다.'
+    : isSearchActive
+    ? '검색 결과가 없습니다.'
+    : '게시글이 존재하지 않습니다.'
 
   return (
     <main className="post-list-shell">
@@ -278,6 +439,32 @@ export default function PostListPage() {
             </button>
           ))}
         </div>
+        {boardType === '장소 추천' && (
+          <div className="city-filter">
+            <label>
+              <span className="sr-only">나라 선택</span>
+              <select value={selectedCountry} onChange={handleCountryChange}>
+                <option value="">전체 국가</option>
+                {CITY_CATEGORIES.map((category) => (
+                  <option key={category.country} value={category.country}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="sr-only">도시 선택</span>
+              <select value={selectedCity} onChange={handleCityChange} disabled={!currentCityOptions.length}>
+                <option value="">모든 도시</option>
+                {currentCityOptions.map((city) => (
+                  <option key={city.value} value={city.value}>
+                    {city.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
         <section className="post-toolbar">
           <form className="post-search" onSubmit={handleSearchSubmit}>
             <label htmlFor="post-search-input" className="sr-only">
@@ -323,16 +510,14 @@ export default function PostListPage() {
 
       {error && <p className="post-status post-status--error">{error}</p>}
 
-      {isLoading && !hasPosts ? (
+      {isLoading && !hasFetchedPosts ? (
         <p className="post-status">게시물 가져오는 중</p>
-      ) : !hasPosts ? (
-        <p className="post-status">
-          {isSearchActive ? '검색 결과가 없습니다.' : '게시글이 존재하지 않습니다.'}
-        </p>
+      ) : !hasDisplayedPosts ? (
+        <p className="post-status">{emptyMessage}</p>
       ) : (
         <>
           <section className="post-grid" aria-live="polite">
-            {posts.map((post) => (
+            {filteredPosts.map((post) => (
               <article
                 key={post.postId}
                 className="post-card"
@@ -386,10 +571,10 @@ export default function PostListPage() {
             ))}
           </section>
           <div ref={sentinelRef} className="post-load-sentinel" aria-hidden="true" />
-          {(isLoadingMore || isLoading) && hasPosts && (
+          {(isLoadingMore || isLoading) && hasFetchedPosts && (
             <p className="post-status">게시물 가져오는 중</p>
           )}
-          {!hasMore && hasPosts && (
+          {!hasMore && hasFetchedPosts && (
             <p className="post-status">더 이상 불러올 게시물이 없습니다.</p>
           )}
         </>
