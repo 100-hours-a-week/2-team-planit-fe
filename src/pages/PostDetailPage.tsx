@@ -113,18 +113,39 @@ export default function PostDetailPage() {
 
   const fetchCommentPage = useCallback(
     async (pageNumber: number, replace = false) => {
-      if (!detail) {
+      const postId = detail?.postId
+      if (!postId) {
         return
       }
       setCommentsLoading(true)
       try {
-        const response = await getPostComments(detail.postId, {
+        const response = await getPostComments(postId, {
           page: pageNumber,
           size: COMMENT_PAGE_SIZE,
         })
-        const incomingComments = Array.isArray(response.comments) ? response.comments : []
-        setComments((prev) => (replace ? incomingComments : [...prev, ...incomingComments]))
-        setHasMoreComments(Boolean(response.hasMore))
+        const isArrayResponse = Array.isArray(response)
+        const incomingComments = isArrayResponse
+          ? response
+          : Array.isArray(response.comments)
+            ? response.comments
+            : Array.isArray(response.content)
+              ? response.content
+              : []
+        const normalizedComments = incomingComments.map((item) => ({
+          ...item,
+          deletable:
+            typeof item.deletable === 'boolean'
+              ? item.deletable
+              : Boolean(user && item.authorId === user.id),
+        }))
+        setComments((prev) => (replace ? normalizedComments : [...prev, ...normalizedComments]))
+        const hasMore = isArrayResponse
+          ? incomingComments.length === COMMENT_PAGE_SIZE
+          : response.hasMore ??
+            (typeof response.last === 'boolean'
+              ? !response.last
+              : incomingComments.length === COMMENT_PAGE_SIZE)
+        setHasMoreComments(Boolean(hasMore))
         setCommentPage(pageNumber + 1)
       } catch {
         showToast('댓글을 불러오는 중 오류가 발생했습니다.')
@@ -132,7 +153,7 @@ export default function PostDetailPage() {
         setCommentsLoading(false)
       }
     },
-    [detail],
+    [detail?.postId],
   )
 
   const loadMoreComments = useCallback(() => {
@@ -143,9 +164,9 @@ export default function PostDetailPage() {
   }, [commentsLoading, commentPage, fetchCommentPage, hasMoreComments])
 
   useEffect(() => {
-    if (!detail) return
+    if (!detail?.postId) return
     fetchCommentPage(0, true)
-  }, [detail, fetchCommentPage])
+  }, [detail?.postId, fetchCommentPage])
 
   useEffect(() => {
     if (!hasMoreComments || commentsLoading) {
@@ -222,8 +243,22 @@ export default function PostDetailPage() {
     console.log('submit comment', detail.postId, trimmed)
     setCommentSubmitting(true)
     try {
-      await createComment(detail.postId, { content: trimmed })
-      window.location.reload()
+      const created = await createComment(detail.postId, { content: trimmed })
+      setComments((prev) => [...prev, created])
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              commentCount: Math.max((prev.commentCount ?? 0) + 1, 0),
+            }
+          : prev,
+      )
+      setNewComment('')
+      const textarea = commentInputRef.current
+      if (textarea) {
+        textarea.style.height = 'auto'
+      }
+      setPendingHighlightId(created.commentId)
     } catch {
       showToast('댓글 등록에 실패했습니다.')
     } finally {
@@ -432,6 +467,8 @@ export default function PostDetailPage() {
             </header>
             <textarea
               ref={commentInputRef}
+              id="comment-content"
+              name="content"
               className="comment-textarea"
               placeholder="댓글을 입력하세요..."
               value={newComment}

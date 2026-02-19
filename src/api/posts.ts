@@ -66,10 +66,12 @@ export interface CommentItem {
   deletable: boolean
 }
 
-export interface CommentPageResponse {
-  comments: CommentItem[]
-  hasMore: boolean
-}
+export type CommentPageResponse = {
+  comments?: CommentItem[]
+  content?: CommentItem[]
+  hasMore?: boolean
+  last?: boolean
+} | CommentItem[]
 
 export interface CreateCommentPayload {
   content: string
