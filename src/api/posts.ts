@@ -12,6 +12,7 @@ export interface PostListItem {
   likeCount: number
   commentCount: number
   representativeImageId?: number | null
+  representativeImageUrl?: string | null
   rankingScore?: number | null
   placeName?: string | null
   tripTitle?: string | null
@@ -72,12 +73,22 @@ export interface CreatePostPayload {
   title: string
   content: string
   imageKeys?: string[]
+  boardType: string
+  planId?: number
+  placeName?: string
+  rating?: number
+  googlePlaceId?: string
 }
 
 export interface UpdatePostPayload {
   title?: string
   content?: string
   imageKeys?: string[]
+  boardType?: string
+  planId?: number
+  placeName?: string
+  rating?: number
+  googlePlaceId?: string
 }
 
 export interface PresignedUrlResponse {
@@ -89,8 +100,10 @@ export interface PresignedUrlResponse {
 const BASE_PATH = '/posts'
 
 export interface PostListResponse {
-  posts: PostListItem[]
-  hasMore: boolean
+  items: PostListItem[]
+  hasNext?: boolean
+  page?: number
+  size?: number
 }
 
 export interface GetPostsParams {
@@ -99,6 +112,7 @@ export interface GetPostsParams {
   sort?: SortParam
   page?: number
   size?: number
+  city?: string
 }
 
 export async function getPosts(params?: GetPostsParams): Promise<PostListResponse> {
