@@ -21,6 +21,7 @@ export interface PostListItem {
 export interface PostDetail {
   postId: number
   boardName: string
+  boardType: string
   boardDescription: string
   title: string
   content: string
@@ -48,6 +49,11 @@ export interface PostDetail {
     deletable: boolean
   }[]
   editable: boolean
+  planId?: number | null
+  planTitle?: string | null
+  planStartDate?: string | null
+  planEndDate?: string | null
+  planThumbnailImageUrl?: string | null
 }
 
 export interface CommentItem {

@@ -59,7 +59,7 @@ export default function PostDetailPage() {
   const [commentToDelete, setCommentToDelete] = useState<CommentItem | null>(null)
   const [comments, setComments] = useState<CommentItem[]>([])
   const [commentPage, setCommentPage] = useState(0)
-  const [hasMoreComments, setHasMoreComments] = useState(false)
+  const [hasMoreComments, setHasMoreComments] = useState(true)
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [commentSubmitting, setCommentSubmitting] = useState(false)
@@ -94,10 +94,6 @@ export default function PostDetailPage() {
         setDetail(response)
         setLikeCount(response.likeCount)
         setLiked(response.likedByRequester)
-        const safeComments = Array.isArray(response.comments) ? response.comments : []
-        setComments(safeComments)
-        setCommentPage(1)
-        setHasMoreComments((response.commentCount ?? 0) > safeComments.length)
       } catch {
         if (!cancelled) {
           setError('게시글을 불러오지 못했습니다.')
@@ -115,26 +111,41 @@ export default function PostDetailPage() {
     }
   }, [id])
 
-  const loadMoreComments = useCallback(async () => {
-    if (commentsLoading || !detail) {
+  const fetchCommentPage = useCallback(
+    async (pageNumber: number, replace = false) => {
+      if (!detail) {
+        return
+      }
+      setCommentsLoading(true)
+      try {
+        const response = await getPostComments(detail.postId, {
+          page: pageNumber,
+          size: COMMENT_PAGE_SIZE,
+        })
+        const incomingComments = Array.isArray(response.comments) ? response.comments : []
+        setComments((prev) => (replace ? incomingComments : [...prev, ...incomingComments]))
+        setHasMoreComments(Boolean(response.hasMore))
+        setCommentPage(pageNumber + 1)
+      } catch {
+        showToast('댓글을 불러오는 중 오류가 발생했습니다.')
+      } finally {
+        setCommentsLoading(false)
+      }
+    },
+    [detail],
+  )
+
+  const loadMoreComments = useCallback(() => {
+    if (commentsLoading || !hasMoreComments) {
       return
     }
-    setCommentsLoading(true)
-    try {
-      const response = await getPostComments(detail.postId, {
-        page: commentPage,
-        size: COMMENT_PAGE_SIZE,
-      })
-      const incomingComments = Array.isArray(response.comments) ? response.comments : []
-      setComments((prev) => [...prev, ...incomingComments])
-      setHasMoreComments(response.hasMore)
-      setCommentPage((prev) => prev + 1)
-    } catch {
-      showToast('댓글을 불러오는 중 오류가 발생했습니다.')
-    } finally {
-      setCommentsLoading(false)
-    }
-  }, [commentPage, commentsLoading, detail])
+    fetchCommentPage(commentPage)
+  }, [commentsLoading, commentPage, fetchCommentPage, hasMoreComments])
+
+  useEffect(() => {
+    if (!detail) return
+    fetchCommentPage(0, true)
+  }, [detail, fetchCommentPage])
 
   useEffect(() => {
     if (!hasMoreComments || commentsLoading) {
@@ -262,9 +273,45 @@ export default function PostDetailPage() {
     }
   }
 
+  const handlePlanCardClick = () => {
+    if (!detail?.planId) {
+      return
+    }
+    navigate(`/trips/${detail.planId}/itineraries`, {
+      state: { readonly: true },
+    })
+  }
+
   const handleCloseLightbox = () => {
     setLightboxImage(null)
   }
+
+  useEffect(() => {
+    if (!lightboxImage) {
+      document.body.style.overflow = ''
+      return undefined
+    }
+
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleCloseLightbox()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = originalOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [lightboxImage])
+
+  const planPeriodLabel =
+    detail?.planStartDate && detail?.planEndDate
+      ? `${detail.planStartDate} ~ ${detail.planEndDate}`
+      : detail?.planStartDate || detail?.planEndDate || ''
 
   const displayedCommentCount = comments.length
   const isAuthor = detail?.author.authorId === user?.id
@@ -316,27 +363,54 @@ export default function PostDetailPage() {
                   <span>💬 {displayedCommentCount}</span>
                 </div>
               </div>
-              {isAuthor && (
-                <div className="post-detail-actions">
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => navigate(`/posts/${detail.postId}/edit`)}
-                  >
-                    수정
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-btn danger"
-                    onClick={() => setPostDeleteModal(true)}
-                  >
-                    삭제
-                  </button>
-                </div>
-              )}
-            </header>
-            {detail.images && detail.images.filter((img) => img.url).length > 0 && (
-              <div className="post-detail-images">
+            {isAuthor && (
+              <div className="post-detail-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => navigate(`/posts/${detail.postId}/edit`)}
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  className="secondary-btn danger"
+                  onClick={() => setPostDeleteModal(true)}
+                >
+                  삭제
+                </button>
+              </div>
+            )}
+          </header>
+          {detail.boardType === 'PLAN_SHARE' && detail.planId && (
+            <article
+              className="plan-share-card"
+              role="button"
+              tabIndex={0}
+              onClick={handlePlanCardClick}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  handlePlanCardClick()
+                }
+              }}
+            >
+              <div className="plan-share-card__image">
+                <img
+                  src={resolveImageUrl(detail.planThumbnailImageUrl, DEFAULT_AVATAR_URL)}
+                  alt={detail.planTitle ? `${detail.planTitle} 썸네일` : '공유된 일정 이미지'}
+                />
+              </div>
+              <div className="plan-share-card__body">
+                <p className="plan-share-card__label">공유된 일정</p>
+                <h2>{detail.planTitle || '공유된 일정'}</h2>
+                {planPeriodLabel && (
+                  <p className="plan-share-card__period">{planPeriodLabel}</p>
+                )}
+              </div>
+            </article>
+          )}
+          {detail.images && detail.images.filter((img) => img.url).length > 0 && (
+            <div className="post-detail-images">
                 {detail.images
                   .filter((img) => img.url)
                   .map((image) => {
