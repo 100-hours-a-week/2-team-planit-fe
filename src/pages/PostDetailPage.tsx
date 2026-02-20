@@ -64,6 +64,7 @@ export default function PostDetailPage() {
   const [newComment, setNewComment] = useState('')
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+  const [pendingHighlightId, setPendingHighlightId] = useState<number | null>(null)
 
   const showToast = (message: string) => {
     setToastInfo({ message, key: Date.now() })
@@ -153,7 +154,7 @@ export default function PostDetailPage() {
         setCommentsLoading(false)
       }
     },
-    [detail?.postId],
+    [detail?.postId, user],
   )
 
   const loadMoreComments = useCallback(() => {
@@ -335,13 +336,25 @@ export default function PostDetailPage() {
         handleCloseLightbox()
       }
     }
+    const listener: EventListener = (event) => handleKeyDown(event as unknown as KeyboardEvent)
 
-    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keydown', listener)
     return () => {
       document.body.style.overflow = originalOverflow
-      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keydown', listener)
     }
   }, [lightboxImage])
+
+  useEffect(() => {
+    if (pendingHighlightId === null) {
+      return
+    }
+    const target = document.getElementById(`comment-${pendingHighlightId}`)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setPendingHighlightId(null)
+    }
+  }, [pendingHighlightId, comments])
 
   const planPeriodLabel =
     detail?.planStartDate && detail?.planEndDate
