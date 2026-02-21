@@ -151,6 +151,12 @@ type ActivityDraft = {
   startTime?: string
 }
 
+type TripRouteState = {
+  tripId?: number
+  tripData?: TripData
+  readonly?: boolean
+}
+
 const getApiErrorCode = (error: unknown) =>
   (error as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
 
@@ -189,12 +195,22 @@ export default function TripCreatePage() {
   const showWantedPlaceSection = true
 
   const routeTripId = Number(params.tripId)
-  const stateTripId = Number((location.state as { tripId?: number } | null)?.tripId)
+  const locationState = (location.state as TripRouteState | null) ?? null
+  const stateTripId = Number(locationState?.tripId)
+  const isReadonlyTripView = Boolean(locationState?.readonly)
   const currentTripId = Number.isFinite(routeTripId) && routeTripId > 0
     ? routeTripId
     : Number.isFinite(stateTripId) && stateTripId > 0
       ? stateTripId
       : null
+
+  const handlePrimaryHeaderAction = () => {
+    if (isReadonlyTripView) {
+      navigate(-1)
+      return
+    }
+    navigate('/')
+  }
 
   const applyFetchedTripData = (data: TripData) => {
     setTripData(data)
@@ -362,11 +378,11 @@ export default function TripCreatePage() {
   }, [])
 
   useEffect(() => {
-    const stateTripData = (location.state as { tripData?: TripData } | null)?.tripData
+    const stateTripData = locationState?.tripData
     if (stateTripData?.itineraries?.length) {
       applyFetchedTripData(stateTripData)
     }
-  }, [location.state])
+  }, [locationState?.tripData])
 
   useEffect(() => {
     if (!currentTripId) return
@@ -454,8 +470,8 @@ export default function TripCreatePage() {
                 <h1>{safeTitle || '일정 생성중'}</h1>
                 {periodLabel && <p>{periodLabel}</p>}
               </div>
-              <button className="pill-button" onClick={() => navigate('/')}>
-                홈으로
+              <button className="pill-button" onClick={handlePrimaryHeaderAction}>
+                {isReadonlyTripView ? '뒤로가기' : '홈으로'}
               </button>
             </header>
             <div className="creating-body">
@@ -487,130 +503,150 @@ export default function TripCreatePage() {
               {schedulePeriod && <p>{schedulePeriod}</p>}
             </div>
             <div className="day-actions">
-              <button
-                className="pill-button"
-                disabled={!currentTripId || tripData?.isOwner === false}
-                onClick={async () => {
-                  if (!currentTripId) return
-                  try {
-                    await deleteTrip(currentTripId)
-                    showToast('일정이 삭제되었습니다.')
-                    navigate('/')
-                  } catch (error) {
-                    console.error('deleteTrip failed', error)
-                    showToast('일정 삭제에 실패했습니다.')
-                  }
-                }}
-              >
-                일정 삭제
-              </button>
-              <button
-                className="pill-button"
-                disabled={tripData?.isOwner === false}
-                onClick={async () => {
-                  if (!showEditMode) {
-                    const drafts: Record<number, ActivityDraft> = {}
-                    sortedActivities.forEach((activity) => {
-                      if (!activity.activityId) return
-                      drafts[activity.activityId] = {
-                        placeName: activity.placeName ?? '',
-                        memo: activity.memo ?? '',
-                        cost: activity.cost != null ? String(activity.cost) : '',
-                        startTime: activity.startTime ?? '',
+              {!isReadonlyTripView && (
+                <>
+                  <button
+                    className="pill-button"
+                    disabled={!currentTripId || tripData?.isOwner === false}
+                    onClick={async () => {
+                      if (!currentTripId) return
+                      try {
+                        await deleteTrip(currentTripId)
+                        showToast('일정이 삭제되었습니다.')
+                        navigate('/')
+                      } catch (error) {
+                        console.error('deleteTrip failed', error)
+                        showToast('일정 삭제에 실패했습니다.')
                       }
-                    })
-                    setEditDrafts(drafts)
-                    setShowEditMode(true)
-                    return
-                  }
+                    }}
+                  >
+                    일정 삭제
+                  </button>
+                  <button
+                    className="pill-button"
+                    disabled={tripData?.isOwner === false}
+                    onClick={async () => {
+                      if (!showEditMode) {
+                        const drafts: Record<number, ActivityDraft> = {}
+                        sortedActivities.forEach((activity) => {
+                          if (!activity.activityId) return
+                          drafts[activity.activityId] = {
+                            placeName: activity.placeName ?? '',
+                            memo: activity.memo ?? '',
+                            cost: activity.cost != null ? String(activity.cost) : '',
+                            startTime: activity.startTime ?? '',
+                          }
+                        })
+                        setEditDrafts(drafts)
+                        setShowEditMode(true)
+                        return
+                      }
 
-                  if (!Number.isFinite(dayId) || dayId <= 0) {
-                    showToast('일정 정보가 없어 수정할 수 없습니다.')
-                    return
-                  }
-                  if (!currentTripId) {
-                    showToast('여행 정보가 없어 수정할 수 없습니다.')
-                    return
-                  }
+                      if (!Number.isFinite(dayId) || dayId <= 0) {
+                        showToast('일정 정보가 없어 수정할 수 없습니다.')
+                        return
+                      }
+                      if (!currentTripId) {
+                        showToast('여행 정보가 없어 수정할 수 없습니다.')
+                        return
+                      }
 
-                  const updates = sortedActivities.reduce((acc, activity) => {
-                    if (!activity.activityId) return acc
-                    const draft = editDrafts[activity.activityId]
-                    if (!draft) return acc
+                      const updates = sortedActivities.reduce(
+                        (acc, activity) => {
+                          if (!activity.activityId) return acc
+                          const draft = editDrafts[activity.activityId]
+                          if (!draft) return acc
 
-                    const trimmedPlace = draft.placeName?.trim()
-                    const trimmedMemo = draft.memo?.trim()
-                    const nextCost =
-                      draft.cost && draft.cost.trim() !== ''
-                        ? Number.parseInt(draft.cost, 10)
-                        : undefined
+                          const trimmedPlace = draft.placeName?.trim()
+                          const trimmedMemo = draft.memo?.trim()
+                          const nextCost =
+                            draft.cost && draft.cost.trim() !== ''
+                              ? Number.parseInt(draft.cost, 10)
+                              : undefined
 
-                    const changes: {
-                      activityId: number
-                      placeName?: string
-                      memo?: string
-                      cost?: number
-                      startTime?: string
-                    } = { activityId: activity.activityId }
+                          const changes: {
+                            activityId: number
+                            placeName?: string
+                            memo?: string
+                            cost?: number
+                            startTime?: string
+                          } = { activityId: activity.activityId }
 
-                    if (trimmedPlace && trimmedPlace !== (activity.placeName ?? '')) {
-                      changes.placeName = trimmedPlace
-                    }
-                    if (trimmedMemo && trimmedMemo !== (activity.memo ?? '')) {
-                      changes.memo = trimmedMemo
-                    }
-                    if (
-                      typeof nextCost === 'number' &&
-                      Number.isFinite(nextCost) &&
-                      nextCost !== activity.cost
-                    ) {
-                      changes.cost = nextCost
-                    }
-                    if (draft.startTime && draft.startTime !== (activity.startTime ?? '')) {
-                      changes.startTime = draft.startTime
-                    }
+                          if (trimmedPlace && trimmedPlace !== (activity.placeName ?? '')) {
+                            changes.placeName = trimmedPlace
+                          }
+                          if (trimmedMemo && trimmedMemo !== (activity.memo ?? '')) {
+                            changes.memo = trimmedMemo
+                          }
+                          if (
+                            typeof nextCost === 'number' &&
+                            Number.isFinite(nextCost) &&
+                            nextCost !== activity.cost
+                          ) {
+                            changes.cost = nextCost
+                          }
+                          if (draft.startTime && draft.startTime !== (activity.startTime ?? '')) {
+                            changes.startTime = draft.startTime
+                          }
 
-                    const keys = Object.keys(changes)
-                    if (keys.length > 1) {
-                      acc.push(changes)
-                    }
-                    return acc
-                  }, [] as { activityId: number; placeName?: string; memo?: string; cost?: number; startTime?: string }[])
+                          const keys = Object.keys(changes)
+                          if (keys.length > 1) {
+                            acc.push(changes)
+                          }
+                          return acc
+                        },
+                        [] as {
+                          activityId: number
+                          placeName?: string
+                          memo?: string
+                          cost?: number
+                          startTime?: string
+                        }[],
+                      )
 
-                  if (updates.length === 0) {
-                    showToast('변경된 내용이 없습니다.')
-                    setShowEditMode(false)
-                    setEditDrafts({})
-                    return
-                  }
+                      if (updates.length === 0) {
+                        showToast('변경된 내용이 없습니다.')
+                        setShowEditMode(false)
+                        setEditDrafts({})
+                        return
+                      }
 
-                  try {
-                    await updateTripDay(currentTripId, dayId, updates)
-                    showToast('일정이 수정되었습니다.')
-                    setShowEditMode(false)
-                    setEditDrafts({})
-                    const latestData = await fetchTripItineraries(currentTripId)
-                    if (latestData?.itineraries?.length) {
-                      applyFetchedTripData(latestData)
-                    }
-                  } catch (error) {
-                    console.error('final updateTripDay catch', error)
-                    showToast('일정 수정에 실패했습니다.')
-                  }
-                }}
-              >
-                {showEditMode ? '수정 완료' : '일정 수정'}
-              </button>
-              <button className="pill-button" onClick={() => navigate('/')}>
-                홈으로
+                      try {
+                        await updateTripDay(currentTripId, dayId, updates)
+                        showToast('일정이 수정되었습니다.')
+                        setShowEditMode(false)
+                        setEditDrafts({})
+                        const latestData = await fetchTripItineraries(currentTripId)
+                        if (latestData?.itineraries?.length) {
+                          applyFetchedTripData(latestData)
+                        }
+                      } catch (error) {
+                        console.error('final updateTripDay catch', error)
+                        showToast('일정 수정에 실패했습니다.')
+                      }
+                    }}
+                  >
+                    {showEditMode ? '수정 완료' : '일정 수정'}
+                  </button>
+                </>
+              )}
+              <button className="pill-button" onClick={handlePrimaryHeaderAction}>
+                {isReadonlyTripView ? '뒤로가기' : '홈으로'}
               </button>
             </div>
           </header>
           {toast && <div className="toast">{toast}</div>}
 
           <div className="tab-row">
-            <button className="tab active">일정</button>
-            <button className="tab">
+            <button className="tab active" type="button">
+              일정
+            </button>
+            <button
+              type="button"
+              className={`tab${isReadonlyTripView ? ' disabled' : ''}`}
+              disabled={isReadonlyTripView}
+              aria-disabled={isReadonlyTripView}
+            >
               채팅
               {hasNewChat && <span className="badge" />}
             </button>
@@ -638,8 +674,15 @@ export default function TripCreatePage() {
             <div className="day-label">Day {selectedDay}</div>
             <div className="day-actions">
               <button
-                className="pill-button"
-                onClick={() => showToast('미지원 기능입니다.')}
+                type="button"
+                className={`pill-button${isReadonlyTripView ? ' disabled' : ''}`}
+                disabled={isReadonlyTripView}
+                onClick={() => {
+                  if (isReadonlyTripView) {
+                    return
+                  }
+                  showToast('미지원 기능입니다.')
+                }}
               >
                 일정 재생성
               </button>

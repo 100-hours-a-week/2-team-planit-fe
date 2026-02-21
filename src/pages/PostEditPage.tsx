@@ -8,7 +8,12 @@ import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import { resolveImageUrl } from '../utils/image'
 
-const BOARD_DESCRIPTION = '자유게시판에서는 여행과 일정 정보, 경험을 나누는 공간입니다.'
+const BOARD_OPTIONS = [
+  { value: 'FREE', label: '자유게시판', description: '여행 경험과 사진을 자유롭게 공유해보세요.' },
+  { value: 'PLAN_SHARE', label: '일정 공유', description: '내 일정 하나를 선택하여 요약하여 공유합니다.' },
+  { value: 'PLACE_RECOMMEND', label: '장소 추천', description: '추천 장소 정보와 별점을 공유합니다.' },
+] as const
+const BOARD_DESCRIPTION = '여행과 장소 정보를 자유롭게 공유해보세요.'
 const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
 
 function getFileExtension(file: File): string {
@@ -23,6 +28,7 @@ export default function PostEditPage() {
   const { user } = useAuth()
 
   const [detail, setDetail] = useState<PostDetail | null>(null)
+  const [boardType, setBoardType] = useState<string>('FREE')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [imageKeys, setImageKeys] = useState<string[]>([])
@@ -63,6 +69,14 @@ export default function PostEditPage() {
           return
         }
         setDetail(response)
+        const mappedType =
+          response.boardType ||
+          (response.boardName?.includes('일정 공유')
+            ? 'PLAN_SHARE'
+            : response.boardName?.includes('장소 추천')
+              ? 'PLACE_RECOMMEND'
+              : 'FREE')
+        setBoardType(mappedType)
         setTitle(response.title)
         setContent(response.content)
         const keys = (response.images ?? [])
@@ -84,6 +98,20 @@ export default function PostEditPage() {
       cancelled = true
     }
   }, [id])
+
+  useEffect(() => {
+    if (!detail) {
+      return
+    }
+    const mappedType =
+      detail.boardType ||
+      (detail.boardName?.includes('일정 공유')
+        ? 'PLAN_SHARE'
+        : detail.boardName?.includes('장소 추천')
+          ? 'PLACE_RECOMMEND'
+          : 'FREE')
+    setBoardType(mappedType)
+  }, [detail?.boardType, detail?.boardName])
 
   useEffect(() => {
     const urls = newFiles.map((file) => URL.createObjectURL(file))
@@ -219,8 +247,12 @@ export default function PostEditPage() {
         <form className="post-create-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="board-select">게시판</label>
-            <select id="board-select" value="FREE" disabled>
-              <option value="FREE">자유게시판</option>
+            <select id="board-select" value={boardType} disabled>
+              {BOARD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
           <div className="form-group">

@@ -21,6 +21,7 @@ export interface PostListItem {
 export interface PostDetail {
   postId: number
   boardName: string
+  boardType: string
   boardDescription: string
   title: string
   content: string
@@ -48,6 +49,11 @@ export interface PostDetail {
     deletable: boolean
   }[]
   editable: boolean
+  planId?: number | null
+  planTitle?: string | null
+  planStartDate?: string | null
+  planEndDate?: string | null
+  planThumbnailImageUrl?: string | null
 }
 
 export interface CommentItem {
@@ -60,10 +66,12 @@ export interface CommentItem {
   deletable: boolean
 }
 
-export interface CommentPageResponse {
-  comments: CommentItem[]
-  hasMore: boolean
-}
+export type CommentPageResponse = {
+  comments?: CommentItem[]
+  content?: CommentItem[]
+  hasMore?: boolean
+  last?: boolean
+} | CommentItem[]
 
 export interface CreateCommentPayload {
   content: string
