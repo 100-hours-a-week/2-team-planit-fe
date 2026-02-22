@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { DEFAULT_PLAN_THUMBNAIL_URL } from '../constants/plan'
 import { resolveImageUrl } from '../utils/image.ts'
 import {
   createComment,
@@ -302,12 +303,10 @@ export default function PostDetailPage() {
   }
 
   const handlePlanCardClick = () => {
-    if (!detail?.planId) {
+  if (!detail?.tripId) {
       return
     }
-    navigate(`/trips/${detail.planId}/itineraries`, {
-      state: { readonly: true },
-    })
+    navigate(`/trips/${detail.tripId}/itineraries?readonly=true`)
   }
 
   const handleCloseLightbox = () => {
@@ -351,11 +350,6 @@ export default function PostDetailPage() {
   useEffect(() => {
     detailRef.current = detail
   }, [detail])
-
-  const planPeriodLabel =
-    detail?.planStartDate && detail?.planEndDate
-      ? `${detail.planStartDate} ~ ${detail.planEndDate}`
-      : detail?.planStartDate || detail?.planEndDate || ''
 
   const totalCommentCount = detail?.commentCount ?? 0
   const isAuthor = detail?.author.authorId === user?.id
@@ -438,7 +432,7 @@ export default function PostDetailPage() {
                 </div>
               )}
             </header>
-            {detail.boardType === 'PLAN_SHARE' && detail.planId && (
+            {detail.tripId && (
               <button
                 type="button"
                 className="plan-share-card"
@@ -448,27 +442,26 @@ export default function PostDetailPage() {
                 <div className="plan-share-card__image">
                   <img
                     src={
-                      resolveImageUrl(
-                        detail.planThumbnailImageUrl ||
-                          detail.images?.find((item) => item.url)?.url,
-                        DEFAULT_AVATAR_URL,
-                      )
+                      detail.planThumbnailUrl
+                        ? resolveImageUrl(detail.planThumbnailUrl, DEFAULT_PLAN_THUMBNAIL_URL)
+                        : DEFAULT_PLAN_THUMBNAIL_URL
                     }
-                    alt={detail.planTitle ? `${detail.planTitle} 썸네일` : '공유된 일정 이미지'}
+                    alt={detail.tripTitle ? `${detail.tripTitle} 썸네일` : '공유된 일정 이미지'}
+                    onError={(event) => {
+                      const target = event.currentTarget
+                      target.onerror = null
+                      target.src = DEFAULT_PLAN_THUMBNAIL_URL
+                    }}
                   />
                 </div>
                 <div className="plan-share-card__body">
                   <p className="plan-share-card__label">공유된 일정</p>
-                  <h2>{detail.planTitle || '공유된 일정'}</h2>
-                  {planPeriodLabel && (
-                    <p className="plan-share-card__period">{planPeriodLabel}</p>
-                  )}
-                  <p className="plan-share-card__hint">일정 재생성 및 채팅은 비활성화</p>
+                  <h2>{detail.tripTitle || '공유된 일정'}</h2>
+                  <p className="plan-share-card__hint">일정 재생성과 채팅은 비활성화</p>
                 </div>
                 <div className="plan-share-card__cta">일정 결과 보기</div>
               </button>
-            )}
-            {detail.images && detail.images.filter((img) => img.url).length > 0 && (
+            )}            {detail.images && detail.images.filter((img) => img.url).length > 0 && (
               <div className="post-detail-images">
                 {detail.images
                   .filter((img) => img.url)

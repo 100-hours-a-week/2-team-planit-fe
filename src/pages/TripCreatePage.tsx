@@ -191,7 +191,8 @@ export default function TripCreatePage() {
   const routeTripId = Number(params.tripId)
   const locationState = (location.state as TripRouteState | null) ?? null
   const stateTripId = Number(locationState?.tripId)
-  const isReadonlyTripView = Boolean(locationState?.readonly)
+  const queryReadonly = new URLSearchParams(location.search).get('readonly') === 'true'
+  const isReadonlyTripView = queryReadonly || Boolean(locationState?.readonly)
   const currentTripId = Number.isFinite(routeTripId) && routeTripId > 0
     ? routeTripId
     : Number.isFinite(stateTripId) && stateTripId > 0
@@ -493,7 +494,7 @@ export default function TripCreatePage() {
                 <>
                   <button
                     className="pill-button"
-                    disabled={!currentTripId || tripData?.isOwner === false}
+                    disabled={!currentTripId || (!isReadonlyTripView && tripData?.isOwner === false)}
                     onClick={async () => {
                       if (!currentTripId) return
                       try {
@@ -510,7 +511,7 @@ export default function TripCreatePage() {
                   </button>
                   <button
                     className="pill-button"
-                    disabled={tripData?.isOwner === false}
+                    disabled={!isReadonlyTripView && tripData?.isOwner === false}
                     onClick={async () => {
                       if (!showEditMode) {
                         const drafts: Record<number, ActivityDraft> = {}
