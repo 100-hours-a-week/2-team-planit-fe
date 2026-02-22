@@ -16,6 +16,14 @@ const BOARD_TYPE_PARAM_MAP: Record<BoardType, string> = {
   '장소 추천': 'PLACE_RECOMMEND',
 }
 
+const BOARD_TYPE_LABEL_BY_PARAM = Object.entries(BOARD_TYPE_PARAM_MAP).reduce(
+  (acc, [label, param]) => {
+    acc[param] = label
+    return acc
+  },
+  {} as Record<string, BoardType>,
+)
+
 const CITY_CATEGORIES = [
   {
     country: 'taiwan',
@@ -210,6 +218,18 @@ export default function PostListPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
   }, [location.key])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const requestedParam = params.get('boardType')
+    if (!requestedParam) {
+      return
+    }
+    const mappedBoard = BOARD_TYPE_LABEL_BY_PARAM[requestedParam]
+    if (mappedBoard && mappedBoard !== boardType) {
+      setBoardType(mappedBoard)
+    }
+  }, [location.search, boardType])
 
   useEffect(() => {
     setPosts([])
@@ -523,20 +543,24 @@ export default function PostListPage() {
                 className="post-card"
                 onClick={() => navigate(`/posts/${post.postId}`)}
               >
-                <div
-                  className={`post-card__media ${
-                    post.representativeImageUrl ? 'has-image' : 'no-image'
-                  }`}
-                  style={
-                    post.representativeImageUrl
-                      ? { backgroundImage: `url(${post.representativeImageUrl})` }
-                      : undefined
-                  }
-                >
-                  {!post.representativeImageUrl && (
-                    <span className="post-card__placeholder-text">PLANIT</span>
-                  )}
-                </div>
+                {(() => {
+                  const shouldShowImage =
+                    boardType !== '일정 공유' && Boolean(post.representativeImageUrl)
+                  return (
+                    <div
+                      className={`post-card__media ${
+                        shouldShowImage ? 'has-image' : 'no-image'
+                      }`}
+                      style={
+                        shouldShowImage
+                          ? { backgroundImage: `url(${post.representativeImageUrl})` }
+                          : undefined
+                      }
+                    >
+                      {!shouldShowImage && <span className="post-card__placeholder-text">PLANIT</span>}
+                    </div>
+                  )
+                })()}
                 <div className="post-card__body">
                   <div className="post-card__header">
                     <span className="post-card__board">{boardType}</span>
