@@ -16,6 +16,13 @@ export interface PostListItem {
   rankingScore?: number | null
   placeName?: string | null
   tripTitle?: string | null
+  planId?: number | null
+  planTitle?: string | null
+  planStartDate?: string | null
+  planEndDate?: string | null
+  planThumbnailImageUrl?: string | null
+  rating?: number | null
+  googlePlaceId?: string | null
 }
 
 export interface PostDetail {
@@ -54,6 +61,8 @@ export interface PostDetail {
   planStartDate?: string | null
   planEndDate?: string | null
   planThumbnailImageUrl?: string | null
+  rating?: number | null
+  googlePlaceId?: string | null
 }
 
 export interface CommentItem {

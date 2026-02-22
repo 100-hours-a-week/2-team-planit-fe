@@ -23,6 +23,7 @@ import type { CommentItem, PostDetail } from '../api/posts'
 import { useAuth } from '../store'
 
 const COMMENT_PAGE_SIZE = 20
+const CONTENT_MAX_LENGTH = 1000
 
 const formatTimeAgo = (value: string) => {
   const timestamp = Date.parse(value)
@@ -47,6 +48,7 @@ export default function PostDetailPage() {
   const { user } = useAuth()
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null)
   const commentSentinelRef = useRef<HTMLDivElement | null>(null)
+  const detailRef = useRef<PostDetail | null>(null)
 
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -76,45 +78,9 @@ export default function PostDetailPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!id) {
-      setError('잘못된 게시글입니다.')
-      setIsLoading(false)
-      return
-    }
-    let cancelled = false
-
-    const fetchDetail = async () => {
-      setIsLoading(true)
-      setError('')
-      try {
-        const response = await getPost(id)
-        if (cancelled) {
-          return
-        }
-        setDetail(response)
-        setLikeCount(response.likeCount)
-        setLiked(response.likedByRequester)
-      } catch {
-        if (!cancelled) {
-          setError('게시글을 불러오지 못했습니다.')
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    fetchDetail()
-    return () => {
-      cancelled = true
-    }
-  }, [id])
-
   const fetchCommentPage = useCallback(
-    async (pageNumber: number, replace = false) => {
-      const postId = detail?.postId
+    async (pageNumber: number, replace = false, overridePostId?: number) => {
+      const postId = overridePostId ?? detailRef.current?.postId
       if (!postId) {
         return
       }
@@ -154,8 +120,56 @@ export default function PostDetailPage() {
         setCommentsLoading(false)
       }
     },
-    [detail?.postId, user],
+    [user],
   )
+
+  const loadPostDetail = useCallback(
+    async (options?: { signal?: { aborted: boolean }; suppressLoading?: boolean }) => {
+      if (!id) {
+        setDetail(null)
+        detailRef.current = null
+        setError('잘못된 게시글입니다.')
+        setIsLoading(false)
+        return
+      }
+      if (!options?.suppressLoading) {
+        setIsLoading(true)
+      }
+      setError('')
+      try {
+        const response = await getPost(id)
+        if (options?.signal?.aborted) {
+          return
+        }
+        setDetail(response)
+        detailRef.current = response
+        setLikeCount(response.likeCount)
+        setLiked(response.likedByRequester)
+        setComments([])
+        setHasMoreComments(true)
+        setCommentPage(0)
+        await fetchCommentPage(0, true, response.postId)
+      } catch {
+        detailRef.current = null
+        if (!options?.signal?.aborted) {
+          setError('게시글을 불러오지 못했습니다.')
+        }
+      } finally {
+        if (!options?.signal?.aborted && !options?.suppressLoading) {
+          setIsLoading(false)
+        }
+      }
+    },
+    [fetchCommentPage, id],
+  )
+
+  useEffect(() => {
+    const controller = { aborted: false }
+    loadPostDetail({ signal: controller })
+    return () => {
+      controller.aborted = true
+    }
+  }, [loadPostDetail])
 
   const loadMoreComments = useCallback(() => {
     if (commentsLoading || !hasMoreComments) {
@@ -163,11 +177,6 @@ export default function PostDetailPage() {
     }
     fetchCommentPage(commentPage)
   }, [commentsLoading, commentPage, fetchCommentPage, hasMoreComments])
-
-  useEffect(() => {
-    if (!detail?.postId) return
-    fetchCommentPage(0, true)
-  }, [detail?.postId, fetchCommentPage])
 
   useEffect(() => {
     if (!hasMoreComments || commentsLoading) {
@@ -241,24 +250,15 @@ export default function PostDetailPage() {
       showToast('게시글 정보를 확인할 수 없습니다.')
       return
     }
-    console.log('submit comment', detail.postId, trimmed)
     setCommentSubmitting(true)
     try {
       const created = await createComment(detail.postId, { content: trimmed })
-      setComments((prev) => [...prev, created])
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              commentCount: Math.max((prev.commentCount ?? 0) + 1, 0),
-            }
-          : prev,
-      )
       setNewComment('')
       const textarea = commentInputRef.current
       if (textarea) {
         textarea.style.height = 'auto'
       }
+      await loadPostDetail({ suppressLoading: true })
       setPendingHighlightId(created.commentId)
     } catch {
       showToast('댓글 등록에 실패했습니다.')
@@ -281,7 +281,7 @@ export default function PostDetailPage() {
     setPostDeleteModal(false)
     try {
       await deletePost(detail.postId)
-      navigate('/posts')
+      navigate('/posts?boardType=PLAN_SHARE')
     } catch {
       showToast('게시글 삭제에 실패했습니다.')
     }
@@ -295,15 +295,7 @@ export default function PostDetailPage() {
     setCommentToDelete(null)
     try {
       await deleteComment(detail.postId, target.commentId)
-      setComments((prev) => prev.filter((item) => item.commentId !== target.commentId))
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              commentCount: Math.max((prev.commentCount ?? 0) - 1, 0),
-            }
-          : prev,
-      )
+      await loadPostDetail({ suppressLoading: true })
     } catch {
       showToast('댓글 삭제에 실패했습니다.')
     }
@@ -356,19 +348,36 @@ export default function PostDetailPage() {
     }
   }, [pendingHighlightId, comments])
 
+  useEffect(() => {
+    detailRef.current = detail
+  }, [detail])
+
   const planPeriodLabel =
     detail?.planStartDate && detail?.planEndDate
       ? `${detail.planStartDate} ~ ${detail.planEndDate}`
       : detail?.planStartDate || detail?.planEndDate || ''
 
-  const displayedCommentCount = comments.length
+  const totalCommentCount = detail?.commentCount ?? 0
   const isAuthor = detail?.author.authorId === user?.id
 
   return (
     <main className="post-detail-shell">
-      <button className="post-detail-back" type="button" onClick={() => navigate('/posts')}>
-        ← 게시물 목록
-      </button>
+      <div className="post-detail-shell__header">
+        <button
+          className="post-detail-back"
+          type="button"
+          onClick={() => navigate('/posts')}
+          aria-label="뒤로가기"
+        >
+          ← 뒤로가기
+        </button>
+        {detail && (
+          <div className="post-detail-shell__board">
+            <p className="post-detail-board__name">{detail.boardName}</p>
+            <p className="post-detail-board__description">{detail.boardDescription}</p>
+          </div>
+        )}
+      </div>
       {toastInfo && (
         <Toast key={toastInfo.key} message={toastInfo.message} onClose={() => setToastInfo(null)} />
       )}
@@ -378,10 +387,6 @@ export default function PostDetailPage() {
         <>
           <section className="post-detail-card">
             <header className="post-detail-header">
-              <p className="post-detail-board">
-                <span className="post-detail-board__name">{detail.boardName}</span>
-                <span className="post-detail-board__description">{detail.boardDescription}</span>
-              </p>
               <div className="post-detail-title-row">
                 <h1>{detail.title}</h1>
                 <span className="post-detail-title-time" aria-label="작성 시간">
@@ -405,60 +410,66 @@ export default function PostDetailPage() {
                     className={`action-like${liked ? ' liked' : ''}`}
                     onClick={handleToggleLike}
                     disabled={likeProcessing}
+                    aria-pressed={liked}
                   >
-                    👍 {likeCount}
+                    좋아요 {likeCount}
                   </button>
-                  <span>💬 {displayedCommentCount}</span>
+                  <span className="post-detail-stats__separator" aria-live="polite">
+                    댓글 {totalCommentCount}
+                  </span>
                 </div>
               </div>
-            {isAuthor && (
-              <div className="post-detail-actions">
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => navigate(`/posts/${detail.postId}/edit`)}
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  className="secondary-btn danger"
-                  onClick={() => setPostDeleteModal(true)}
-                >
-                  삭제
-                </button>
-              </div>
+              {isAuthor && (
+                <div className="post-detail-actions">
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => navigate(`/posts/${detail.postId}/edit`)}
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-btn danger"
+                    onClick={() => setPostDeleteModal(true)}
+                  >
+                    삭제
+                  </button>
+                </div>
+              )}
+            </header>
+            {detail.boardType === 'PLAN_SHARE' && detail.planId && (
+              <button
+                type="button"
+                className="plan-share-card"
+                onClick={handlePlanCardClick}
+                aria-label="공유된 일정 결과로 이동"
+              >
+                <div className="plan-share-card__image">
+                  <img
+                    src={
+                      resolveImageUrl(
+                        detail.planThumbnailImageUrl ||
+                          detail.images?.find((item) => item.url)?.url,
+                        DEFAULT_AVATAR_URL,
+                      )
+                    }
+                    alt={detail.planTitle ? `${detail.planTitle} 썸네일` : '공유된 일정 이미지'}
+                  />
+                </div>
+                <div className="plan-share-card__body">
+                  <p className="plan-share-card__label">공유된 일정</p>
+                  <h2>{detail.planTitle || '공유된 일정'}</h2>
+                  {planPeriodLabel && (
+                    <p className="plan-share-card__period">{planPeriodLabel}</p>
+                  )}
+                  <p className="plan-share-card__hint">일정 재생성 및 채팅은 비활성화</p>
+                </div>
+                <div className="plan-share-card__cta">일정 결과 보기</div>
+              </button>
             )}
-          </header>
-          {detail.boardType === 'PLAN_SHARE' && detail.planId && (
-            <article
-              className="plan-share-card"
-              role="button"
-              tabIndex={0}
-              onClick={handlePlanCardClick}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  handlePlanCardClick()
-                }
-              }}
-            >
-              <div className="plan-share-card__image">
-                <img
-                  src={resolveImageUrl(detail.planThumbnailImageUrl, DEFAULT_AVATAR_URL)}
-                  alt={detail.planTitle ? `${detail.planTitle} 썸네일` : '공유된 일정 이미지'}
-                />
-              </div>
-              <div className="plan-share-card__body">
-                <p className="plan-share-card__label">공유된 일정</p>
-                <h2>{detail.planTitle || '공유된 일정'}</h2>
-                {planPeriodLabel && (
-                  <p className="plan-share-card__period">{planPeriodLabel}</p>
-                )}
-              </div>
-            </article>
-          )}
-          {detail.images && detail.images.filter((img) => img.url).length > 0 && (
-            <div className="post-detail-images">
+            {detail.images && detail.images.filter((img) => img.url).length > 0 && (
+              <div className="post-detail-images">
                 {detail.images
                   .filter((img) => img.url)
                   .map((image) => {
@@ -471,12 +482,17 @@ export default function PostDetailPage() {
                   })}
               </div>
             )}
-            <article className="post-detail-content">{detail.content}</article>
+            <article className="post-detail-content">
+              {detail.content.slice(0, CONTENT_MAX_LENGTH)}
+              {detail.content.length > CONTENT_MAX_LENGTH && (
+                <p className="post-detail-content__limit">최대 1,000자까지 표시됩니다.</p>
+              )}
+            </article>
           </section>
           <section className="comment-input-shell">
             <header>
               <strong>댓글 작성</strong>
-              <span>{newComment.length}/500</span>
+              <span>{newComment.length}/500자</span>
             </header>
             <textarea
               ref={commentInputRef}
@@ -502,26 +518,30 @@ export default function PostDetailPage() {
           </section>
           <section className="post-detail-comments">
             <header>
-              <strong>댓글 ({displayedCommentCount})</strong>
-              <p>최대 20개씩, 오래된 순</p>
+              <div>
+                <strong>댓글 ({totalCommentCount})</strong>
+                <p>최대 20개, 작성 시간 기준 오래된 순</p>
+              </div>
             </header>
             <div className="comment-list">
               {comments.length === 0 && <p className="post-status">댓글이 없습니다.</p>}
               {comments.map((comment) => (
-                <article key={comment.commentId} className="comment-card">
-                  <div className="comment-author">
-                    <img
-                      src={resolveImageUrl(comment.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
-                      alt={`${comment.authorNickname} 프로필`}
-                    />
-                    <div>
-                      <strong>{comment.authorNickname}</strong>
-                      <span>{formatTimeAgo(comment.createdAt)}</span>
+                <article key={comment.commentId} className="comment-card" id={`comment-${comment.commentId}`}>
+                  <div className="comment-card__head">
+                    <div className="comment-author">
+                      <img
+                        src={resolveImageUrl(comment.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
+                        alt={`${comment.authorNickname} 프로필`}
+                      />
+                      <div>
+                        <strong>{comment.authorNickname}</strong>
+                        <span>{formatTimeAgo(comment.createdAt)}</span>
+                      </div>
                     </div>
                     {comment.deletable && (
                       <button
                         type="button"
-                        className="text-link danger"
+                        className="text-link danger comment-delete"
                         onClick={() => setCommentToDelete(comment)}
                       >
                         삭제
