@@ -63,6 +63,9 @@ export interface PostDetail {
   planThumbnailImageUrl?: string | null
   rating?: number | null
   googlePlaceId?: string | null
+  tripId?: number | null
+  tripTitle?: string | null
+  planThumbnailUrl?: string | null
 }
 
 export interface CommentItem {
