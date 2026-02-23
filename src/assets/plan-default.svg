@@ -1,25 +1,17 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="600" rx="40" fill="#F3F4F8" />
   <defs>
-    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FDF6EA"/>
-      <stop offset="100%" stop-color="#FFF2D8"/>
-    </linearGradient>
-    <linearGradient id="pinGlow" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#F5B636"/>
-      <stop offset="100%" stop-color="#E19F1E"/>
+    <linearGradient id="pinGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FF7A6F" />
+      <stop offset="100%" stop-color="#FF4B4B" />
     </linearGradient>
   </defs>
-  <rect width="800" height="600" rx="40" fill="url(#bgGradient)" stroke="#F4D29B" stroke-width="4"/>
-  <g transform="translate(400, 270)">
-    <path
-      d="M0,-80c26,0 47,21 47,47s-47,110-47,110-47-70-47-110 21-47 47-47Z"
-      fill="url(#pinGlow)"
-    />
-    <circle cx="0" cy="-23" r="36" fill="#fff"/>
-    <circle cx="0" cy="-23" r="14" fill="#E19F1E"/>
-  </g>
-  <text x="50%" y="68%" text-anchor="middle" font-size="72" font-weight="800" letter-spacing="16" font-family="Pretendard, Noto Sans KR, Arial, sans-serif" fill="#1C1C1C">
+  <path d="M400 150c-35 0-64 29-64 64 0 35 64 150 64 150s64-114 64-150c0-35-29-64-64-64z" fill="url(#pinGradient)" />
+  <circle cx="400" cy="214" r="28" fill="#FFE3E1" />
+  <text x="400" y="360" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-size="88" font-weight="700" letter-spacing="0.3em" fill="#1E1F2A">
     PLANIT
+  </text>
+  <text x="400" y="420" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-size="28" fill="#6C6F85" letter-spacing="0.2em">
+    TRAVEL STORIES
   </text>
 </svg>

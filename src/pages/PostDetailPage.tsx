@@ -22,6 +22,7 @@ import {
 } from '../api/posts'
 import type { CommentItem, PostDetail } from '../api/posts'
 import { useAuth } from '../store'
+import { getPlaceDetail, type PlaceDetail } from '../api/placeRecommendations'
 
 const COMMENT_PAGE_SIZE = 20
 const CONTENT_MAX_LENGTH = 1000
@@ -54,6 +55,9 @@ export default function PostDetailPage() {
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null)
+  const [placeLoading, setPlaceLoading] = useState(false)
+  const [placeError, setPlaceError] = useState('')
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [likeCount, setLikeCount] = useState(0)
   const [liked, setLiked] = useState(false)
@@ -78,6 +82,44 @@ export default function PostDetailPage() {
       setToastInfo(null)
     }
   }, [])
+
+  useEffect(() => {
+    if (!detail || detail.boardType !== 'PLACE_RECOMMEND' || !detail.googlePlaceId) {
+      setPlaceDetail(null)
+      setPlaceError('')
+      setPlaceLoading(false)
+      return
+    }
+
+    let cancelled = false
+
+    const googlePlaceId = detail.googlePlaceId as string
+    const loadPlace = async () => {
+      setPlaceLoading(true)
+      setPlaceError('')
+      try {
+        const place = await getPlaceDetail(googlePlaceId)
+        if (!cancelled) {
+          setPlaceDetail(place)
+        }
+      } catch (err) {
+        console.error('fetch place detail failed', err)
+        if (!cancelled) {
+          setPlaceError('장소 정보를 불러올 수 없습니다.')
+          setPlaceDetail(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setPlaceLoading(false)
+        }
+      }
+    }
+
+    loadPlace()
+    return () => {
+      cancelled = true
+    }
+  }, [detail])
 
   const fetchCommentPage = useCallback(
     async (pageNumber: number, replace = false, overridePostId?: number) => {
@@ -379,10 +421,14 @@ export default function PostDetailPage() {
       {!isLoading && error && <p className="post-status post-status--error">{error}</p>}
       {!isLoading && !error && detail && (
         <>
+          <div className="post-detail-board">
+            <p className="post-detail-board__name">{detail.boardName}</p>
+            <p className="post-detail-board__description">{detail.boardDescription}</p>
+          </div>
           <section className="post-detail-card">
             <header className="post-detail-header">
               <div className="post-detail-title-row">
-                <h1>{detail.title}</h1>
+                <h1 style={{ whiteSpace: 'pre-wrap' }}>{detail.title}</h1>
                 <span className="post-detail-title-time" aria-label="작성 시간">
                   {formatTimeAgo(detail.createdAt)}
                 </span>
@@ -392,6 +438,11 @@ export default function PostDetailPage() {
                   <img
                     src={resolveImageUrl(detail.author.profileImageUrl, DEFAULT_AVATAR_URL)}
                     alt={`${detail.author.nickname} 프로필`}
+                    onError={(event) => {
+                      const target = event.currentTarget
+                      target.onerror = null
+                      target.src = DEFAULT_AVATAR_URL
+                    }}
                   />
                   <div>
                     <strong>{detail.author.nickname}</strong>
@@ -449,7 +500,8 @@ export default function PostDetailPage() {
                     alt={detail.tripTitle ? `${detail.tripTitle} 썸네일` : '공유된 일정 이미지'}
                     onError={(event) => {
                       const target = event.currentTarget
-                      target.onerror = null
+                      if (target.dataset.fallback === 'applied') return
+                      target.dataset.fallback = 'applied'
                       target.src = DEFAULT_PLAN_THUMBNAIL_URL
                     }}
                   />
@@ -461,7 +513,56 @@ export default function PostDetailPage() {
                 </div>
                 <div className="plan-share-card__cta">일정 결과 보기</div>
               </button>
-            )}            {detail.images && detail.images.filter((img) => img.url).length > 0 && (
+            )}
+            {detail.boardType === 'PLACE_RECOMMEND' && (
+              <section className="place-recommend-card">
+                {placeLoading && (
+                  <p className="place-recommend-card__message">장소 정보를 불러오는 중...</p>
+                )}
+                {placeError && (
+                  <p className="place-recommend-card__message place-recommend-card__message--error">
+                    {placeError}
+                  </p>
+                )}
+                {placeDetail && (
+                  <button
+                    type="button"
+                    className="place-recommend-card__body"
+                    onClick={() => window.open(placeDetail.googleMapsUrl, '_blank')}
+                  >
+                    <div className="place-recommend-card__image">
+                      <img
+                        src={
+                          placeDetail.photoUrl
+                            ? resolveImageUrl(placeDetail.photoUrl, DEFAULT_PLAN_THUMBNAIL_URL)
+                            : DEFAULT_PLAN_THUMBNAIL_URL
+                        }
+                        alt={`${placeDetail.name} 대표 이미지`}
+                        onError={(event) => {
+                          const target = event.currentTarget
+                          if (target.dataset.fallback === 'applied') {
+                            return
+                          }
+                          target.dataset.fallback = 'applied'
+                          target.src = DEFAULT_PLAN_THUMBNAIL_URL
+                        }}
+                      />
+                    </div>
+                    <div className="place-recommend-card__info">
+                      <strong>{placeDetail.name}</strong>
+                      <span>{`${placeDetail.city} · ${placeDetail.country}`}</span>
+                    </div>
+                    <div className="place-recommend-card__meta">
+                      <span className="place-recommend-card__rating">
+                        ★ {detail.userRating ?? detail.rating ?? 0}
+                      </span>
+                      <span>{formatTimeAgo(detail.createdAt)}</span>
+                    </div>
+                  </button>
+                )}
+              </section>
+            )}
+            {detail.images && detail.images.filter((img) => img.url).length > 0 && (
               <div className="post-detail-images">
                 {detail.images
                   .filter((img) => img.url)
