@@ -15,7 +15,7 @@ jobs:
       - name: Find CI ID
         id: find_run
         run: |
-          RUN_ID=$(gh run list --workflow "CI - Frontend" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          RUN_ID=$(gh run list --workflow "CI - Frontend" --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')
           
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
             echo "성공한 CI ID를 찾을 수 없습니다."
