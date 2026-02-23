@@ -178,7 +178,7 @@ export default function PostEditPage() {
       setRating(0)
       setLocationQuery(detail.placeName ?? '')
     }
-  }, [detail, detail?.boardType, detail?.boardName, detail?.placeName])
+  }, [detail?.boardType, detail?.boardName, detail?.placeName])
 
   useEffect(() => {
     if (boardType !== 'PLAN_SHARE') {
