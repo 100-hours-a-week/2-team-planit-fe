@@ -1,17 +1,17 @@
 name: Rollback - Frontend
 
 on:
-  workflow_dispatch:  # 수동 실행
+  workflow_dispatch:  # Actions 탭에서 수동 실행
 
 jobs:
   frontend-rollback:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 마지막으로 성공한 CI ID 조회
+      # 마지막으로 성공한 CI 빌드의 run ID 조회 (해당 아티팩트로 롤백)
       - name: Find CI ID
         id: find_run
         run: |
@@ -30,71 +30,45 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # CD 실행
+      # 조회한 CI run의 frontend-dist 아티팩트 다운로드
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
-          name: frontend-dist 
+          name: frontend-dist
           path: dist
           run-id: ${{ steps.find_run.outputs.target_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get GitHub Actions IP
-        id: get-ip
-        uses: haythem/public-ip@v1.3
-
-      - name: Add IP to SG
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ap-northeast-2
-        run: |
-          aws ec2 authorize-security-group-ingress \
-            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.get-ip.outputs.ipv4 }}/32 \
-            || echo "IP may already be in security group"
-          sleep 10
-
-      - name: Copy Dist to EC2
-        uses: appleboy/scp-action@v0.1.7
+      # S3 업로드용 AWS 자격 증명 설정
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "dist/*"
-          target: "/home/ubuntu/temp_dist"
-          strip_components: 1
+          aws-access-key-id: ${{ secrets.AWS_ACTIONS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACTIONS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
 
-      - name: Deploy to Caddy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo rm -rf /usr/share/caddy/dist/*
-            sudo mkdir -p /usr/share/caddy/dist
-            sudo cp -r /home/ubuntu/temp_dist/* /usr/share/caddy/dist/
-            sudo chown -R caddy:caddy /usr/share/caddy/dist
-            rm -rf /home/ubuntu/temp_dist
-            sudo systemctl reload caddy || true
-
-      - name: Remove IP from Security Group
-        if: always()
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ap-northeast-2
+      # S3에 이전 빌드 파일 동기화 (배포와 동일한 캐시 정책 적용)
+      - name: Sync to S3
         run: |
-          aws ec2 revoke-security-group-ingress \
-            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.get-ip.outputs.ipv4 }}/32 \
-            || echo "Failed to remove IP or rule not found"
+          aws s3 sync dist/ s3://${{ secrets.AWS_S3_BUCKET_FE }}/dist/ \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" \
+            --exclude "*.html"
+          aws s3 sync dist/ s3://${{ secrets.AWS_S3_BUCKET_FE }}/dist/ \
+            --cache-control "public, max-age=0, must-revalidate" \
+            --exclude "*" \
+            --include "index.html" \
+            --include "*.html"
 
+      # CloudFront 캐시 무효화로 롤백된 버전 즉시 반영
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_ID }} \
+            --paths "/*"
+
+      # 성공/실패 여부와 관계없이 Discord 알림 전송
       - name: Send Discord Notification
         if: always()
         run: |
