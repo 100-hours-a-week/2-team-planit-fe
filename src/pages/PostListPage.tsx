@@ -10,19 +10,19 @@ import { useAuth } from '../store'
 import { createPortal } from 'react-dom'
 
 const BOARD_TYPES = ['자유 게시판', '일정 공유', '장소 추천'] as const
-type BoardType = (typeof BOARD_TYPES)[number]
 const BOARD_TYPE_PARAM_MAP: Record<BoardType, string> = {
   '자유 게시판': 'FREE',
   '일정 공유': 'PLAN_SHARE',
-  '장소 추천': 'PLACE_RECOMMENDATION',
+  '장소 추천': 'PLACE_RECOMMEND',
 }
 
-const BOARD_TYPE_LABEL_BY_PARAM = (
-  Object.entries(BOARD_TYPE_PARAM_MAP) as [BoardType, string][]
-).reduce<Record<string, BoardType>>((acc, [label, param]) => {
-  acc[param] = label
-  return acc
-}, {})
+const BOARD_TYPE_LABEL_BY_PARAM = Object.entries(BOARD_TYPE_PARAM_MAP).reduce(
+  (acc, [label, param]) => {
+    acc[param] = label
+    return acc
+  },
+  {} as Record<string, BoardType>,
+)
 
 const CITY_CATEGORIES = [
   {
@@ -161,6 +161,8 @@ const formatTimeAgo = (value: string) => {
   const diffDays = Math.floor(diffHours / 24)
   return `${diffDays}일 전`
 }
+
+type BoardType = (typeof BOARD_TYPES)[number]
 
 const ScrollTopButton = () => {
   if (typeof document === 'undefined') {
