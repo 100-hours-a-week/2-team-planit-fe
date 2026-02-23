@@ -14,7 +14,7 @@ type BoardType = (typeof BOARD_TYPES)[number]
 const BOARD_TYPE_PARAM_MAP: Record<BoardType, string> = {
   '자유 게시판': 'FREE',
   '일정 공유': 'PLAN_SHARE',
-  '장소 추천': 'PLACE_RECOMMEND',
+  '장소 추천': 'PLACE_RECOMMENDATION',
 }
 
 const BOARD_TYPE_LABEL_BY_PARAM = (
