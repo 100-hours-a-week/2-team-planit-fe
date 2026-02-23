@@ -65,6 +65,7 @@ export interface PostDetail {
   rating?: number | null
   googlePlaceId?: string | null
   placeName?: string | null
+  userRating?: number | null
   tripId?: number | null
   tripTitle?: string | null
   planThumbnailUrl?: string | null
