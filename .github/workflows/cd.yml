@@ -54,7 +54,7 @@ jobs:
       - name: Send Discord Notification
         if: failure()
         run: |
-          MSG="CD - Frontend 실패"
+          MSG="🔴 CD - Frontend 실패! (Prod)"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -H "Content-Type: application/json" \
                -X POST \
