@@ -4,8 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { createPost, deletePostImageByKey, getPostPresignedUrl } from '../api/posts'
 import type { CreatePostPayload } from '../api/posts'
 import Toast from '../components/Toast'
-import { fetchTrips } from '../api/trips'
-import type { TripListItem } from '../api/trips'
 
 const BOARD_OPTIONS = [
   { value: 'FREE', label: '자유게시판', description: '여행 경험과 사진을 자유롭게 공유해보세요.' },
@@ -38,6 +36,19 @@ type WindowWithGoogle = Window & typeof globalThis & {
     }
   }
 }
+
+type ScheduleItem = {
+  planId: number
+  title: string
+  period: string
+  route: string
+}
+
+const SCHEDULE_MODAL_DATA: ScheduleItem[] = [
+  { planId: 601, title: '서울-부산 3박4일', period: '2026.03.01 ~ 2026.03.04', route: '서울 → 대전 → 부산' },
+  { planId: 602, title: '제주 힐링 2박3일', period: '2026.04.10 ~ 2026.04.12', route: '제주 시내 → 한라산 → 해안도로' },
+  { planId: 603, title: '교토+도쿄 5일', period: '2026.05.05 ~ 2026.05.09', route: '교토 → 오사카 → 도쿄' },
+]
 
 type PlaceSuggestion = {
   placeId: number
@@ -88,8 +99,7 @@ export default function PostCreatePage() {
   const [imageKeys, setImageKeys] = useState<string[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
-  const [selectedSchedule, setSelectedSchedule] = useState<TripListItem | null>(null)
-  const [trips, setTrips] = useState<TripListItem[]>([])
+  const [selectedSchedule, setSelectedSchedule] = useState<ScheduleItem | null>(null)
   const [locationQuery, setLocationQuery] = useState('')
   const [selectedLocation, setSelectedLocation] = useState<PlaceSuggestion | null>(null)
   const [rating, setRating] = useState(0)
@@ -118,21 +128,6 @@ export default function PostCreatePage() {
       setGooglePlaceId('')
     }
   }, [boardType])
-
-  useEffect(() => {
-    if (boardType !== 'PLAN_SHARE' || trips.length > 0) {
-      return
-    }
-    const loadTrips = async () => {
-      try {
-        const data = await fetchTrips()
-        setTrips(data)
-      } catch {
-        showToast('여행 일정을 불러오지 못했습니다.')
-      }
-    }
-    loadTrips()
-  }, [boardType, trips.length])
 
   const validation = useMemo(() => {
     const errors: Record<string, string> = {}
@@ -308,7 +303,7 @@ export default function PostCreatePage() {
       title: title.trim(),
       content: content.trim(),
       imageKeys: boardType === 'FREE' && imageKeys.length ? imageKeys : undefined,
-      planId: boardType === 'PLAN_SHARE' && selectedSchedule ? selectedSchedule.tripId : undefined,
+      planId: boardType === 'PLAN_SHARE' && selectedSchedule ? selectedSchedule.planId : undefined,
       placeName: boardType === 'PLACE_RECOMMEND' && selectedLocation ? selectedLocation.name : undefined,
       rating: boardType === 'PLACE_RECOMMEND' ? rating : undefined,
       googlePlaceId: boardType === 'PLACE_RECOMMEND' ? googlePlaceId || undefined : undefined,
@@ -406,15 +401,13 @@ export default function PostCreatePage() {
             <button type="button" className="secondary-btn" onClick={() => setScheduleModalOpen(true)}>
               일정 선택하기
             </button>
-        {selectedSchedule && (
-          <div className="schedule-summary">
-            <strong>{selectedSchedule.title}</strong>
-            <p>
-              {selectedSchedule.startDate} ~ {selectedSchedule.endDate}
-            </p>
-            <p>{selectedSchedule.travelCity}</p>
-          </div>
-        )}
+            {selectedSchedule && (
+              <div className="schedule-summary">
+                <strong>{selectedSchedule.title}</strong>
+                <p>{selectedSchedule.period}</p>
+                <p>{selectedSchedule.route}</p>
+              </div>
+            )}
             {validation.errors.schedule && <p className="form-error">{validation.errors.schedule}</p>}
           </div>
         )}
@@ -476,28 +469,21 @@ export default function PostCreatePage() {
               </button>
             </header>
             <ul>
-              {trips.map((trip) => (
-                <li key={trip.tripId}>
+              {SCHEDULE_MODAL_DATA.map((schedule) => (
+                <li key={schedule.planId}>
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedSchedule(trip)
+                      setSelectedSchedule(schedule)
                       setScheduleModalOpen(false)
                     }}
                   >
-                    <strong>{trip.title}</strong>
-                    <span>
-                      {trip.startDate} ~ {trip.endDate}
-                    </span>
-                    <p>{trip.travelCity}</p>
+                    <strong>{schedule.title}</strong>
+                    <span>{schedule.period}</span>
+                    <p>{schedule.route}</p>
                   </button>
                 </li>
               ))}
-              {trips.length === 0 && (
-                <li>
-                  <p>작성된 일정이 없습니다.</p>
-                </li>
-              )}
             </ul>
           </div>
         </div>
