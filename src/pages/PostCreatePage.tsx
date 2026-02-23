@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPost, deletePostImageByKey, getPostPresignedUrl } from '../api/posts'
@@ -6,6 +6,8 @@ import type { CreatePostPayload } from '../api/posts'
 import Toast from '../components/Toast'
 import { fetchTrips } from '../api/trips'
 import type { TripListItem } from '../api/trips'
+import type { PlaceSearchResult } from '../api/placeRecommendations'
+import { searchPlaceRecommendations } from '../api/placeRecommendations'
 
 const BOARD_OPTIONS = [
   { value: 'FREE', label: '자유게시판', description: '여행 경험과 사진을 자유롭게 공유해보세요.' },
@@ -18,60 +20,6 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 type BoardValue = (typeof BOARD_OPTIONS)[number]['value'] | ''
 
-type GooglePlaceInfo = {
-  place_id?: string
-  name?: string
-  formatted_address?: string
-}
-
-type GoogleAutocomplete = {
-  getPlace: () => GooglePlaceInfo
-  addListener: (event: string, handler: () => void) => { remove: () => void }
-}
-
-type WindowWithGoogle = Window & typeof globalThis & {
-  google?: {
-    maps?: {
-      places?: {
-        Autocomplete: new (input: HTMLInputElement, options: { fields: string[] }) => GoogleAutocomplete
-      }
-    }
-  }
-}
-
-type PlaceSuggestion = {
-  placeId: number
-  name: string
-  city: string
-}
-
-const PLACE_SUGGESTIONS: PlaceSuggestion[] = [
-  { placeId: 201, name: '가오슝', city: '타이완 · 가오슝' },
-  { placeId: 202, name: '괌', city: '미국 · 괌' },
-  { placeId: 203, name: '나고야', city: '일본 · 나고야' },
-  { placeId: 204, name: '나트랑', city: '베트남 · 나트랑' },
-  { placeId: 205, name: '다낭', city: '베트남 · 다낭' },
-  { placeId: 206, name: '도쿄', city: '일본 · 도쿄' },
-  { placeId: 207, name: '런던', city: '영국 · 런던' },
-  { placeId: 208, name: '로마', city: '이탈리아 · 로마' },
-  { placeId: 209, name: '마닐라', city: '필리핀 · 마닐라' },
-  { placeId: 210, name: '마카오', city: '중국 · 마카오' },
-  { placeId: 211, name: '바르셀로나', city: '스페인 · 바르셀로나' },
-  { placeId: 212, name: '방콕', city: '태국 · 방콕' },
-  { placeId: 213, name: '보라카이', city: '필리핀 · 보라카이' },
-  { placeId: 214, name: '보홀', city: '필리핀 · 보홀' },
-  { placeId: 215, name: '사이판', city: '미국 · 사이판' },
-  { placeId: 216, name: '상하이', city: '중국 · 상하이' },
-  { placeId: 217, name: '세부', city: '필리핀 · 세부' },
-  { placeId: 218, name: '싱가포르', city: '싱가포르 · 싱가포르' },
-  { placeId: 219, name: '오사카', city: '일본 · 오사카' },
-  { placeId: 220, name: '오키나와', city: '일본 · 오키나와' },
-  { placeId: 221, name: '파리', city: '프랑스 · 파리' },
-  { placeId: 222, name: '푸꾸옥', city: '베트남 · 푸꾸옥' },
-  { placeId: 223, name: '하노이', city: '베트남 · 하노이' },
-  { placeId: 224, name: '홍콩', city: '홍콩 · 홍콩' },
-  { placeId: 225, name: '후쿠오카', city: '일본 · 후쿠오카' },
-]
 
 function getFileExtension(file: File): string {
   const segments = file.name.toLowerCase().split('.')
@@ -90,12 +38,14 @@ export default function PostCreatePage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [selectedSchedule, setSelectedSchedule] = useState<TripListItem | null>(null)
   const [trips, setTrips] = useState<TripListItem[]>([])
-  const [locationQuery, setLocationQuery] = useState('')
-  const [selectedLocation, setSelectedLocation] = useState<PlaceSuggestion | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<PlaceSearchResult | null>(null)
   const [rating, setRating] = useState(0)
-  const [googlePlaceId, setGooglePlaceId] = useState('')
-  const [autocompleteReady, setAutocompleteReady] = useState(false)
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [placeSearchOpen, setPlaceSearchOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [searchResults, setSearchResults] = useState<PlaceSearchResult[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState('')
+  const [titleTouched, setTitleTouched] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
 
@@ -113,9 +63,9 @@ export default function PostCreatePage() {
     }
     if (boardType !== 'PLACE_RECOMMEND') {
       setSelectedLocation(null)
-      setLocationQuery('')
       setRating(0)
-      setGooglePlaceId('')
+      setTitleTouched(false)
+      setPlaceSearchOpen(false)
     }
   }, [boardType])
 
@@ -165,76 +115,32 @@ export default function PostCreatePage() {
   }, [boardType, title, content, selectedSchedule, selectedLocation, rating])
 
   useEffect(() => {
-    if (!inputRef.current) {
+    if (!placeSearchOpen) {
+      setSearchResults([])
+      setSearchError('')
       return
     }
-    if (typeof window === 'undefined') {
+    if (!searchTerm.trim()) {
+      setSearchResults([])
+      setSearchError('')
       return
     }
-    const hasGoogle = (window as WindowWithGoogle).google
-    if (hasGoogle?.maps?.places) {
-      setAutocompleteReady(true)
-      return
-    }
-    const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY
-    if (!apiKey) {
-      return
-    }
-    const existing = document.querySelector<HTMLScriptElement>('script[data-google-places]')
-    if (existing) {
-      existing.addEventListener('load', () => setAutocompleteReady(true))
-      return
-    }
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
-    script.async = true
-    script.defer = true
-    script.dataset.googlePlaces = 'true'
-    script.onload = () => setAutocompleteReady(true)
-    document.head.appendChild(script)
-  }, [])
-
-  useEffect(() => {
-    if (!autocompleteReady || !inputRef.current) {
-      return
-    }
-    const google = (window as WindowWithGoogle).google
-    if (!google?.maps?.places) {
-      return
-    }
-    const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-      fields: ['place_id', 'name', 'formatted_address'],
-    })
-      const listener = autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace()
-        if (!place.place_id) {
-          return
-        }
-        setSelectedLocation({
-          placeId: Number(place.place_id.replace(/\D/g, '')) || 0,
-          name: place.name ?? '',
-          city: place.formatted_address ?? '',
-        })
-        setGooglePlaceId(place.place_id)
-        if (place.name) {
-          setTitle(place.name)
-          setLocationQuery(place.name)
-        }
-      })
+    const handler = window.setTimeout(async () => {
+      setSearchLoading(true)
+      setSearchError('')
+      try {
+        const results = await searchPlaceRecommendations(searchTerm.trim())
+        setSearchResults(results)
+      } catch {
+        setSearchError('장소 검색에 실패했습니다.')
+      } finally {
+        setSearchLoading(false)
+      }
+    }, 300)
     return () => {
-      listener.remove()
+      window.clearTimeout(handler)
     }
-  }, [autocompleteReady])
-
-  const filteredPlaces = useMemo(() => {
-    const query = locationQuery.trim().toLowerCase()
-    if (!query) {
-      return PLACE_SUGGESTIONS
-    }
-    return PLACE_SUGGESTIONS.filter(
-      (item) => item.name.toLowerCase().includes(query) || item.city.toLowerCase().includes(query),
-    )
-  }, [locationQuery])
+  }, [searchTerm, placeSearchOpen])
 
   const handleImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -286,10 +192,31 @@ export default function PostCreatePage() {
     }
   }
 
-  const handleSelectPlace = (place: PlaceSuggestion) => {
+  const handleTitleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value.slice(0, 24)
+    setTitle(nextValue)
+    setTitleTouched(true)
+  }
+
+  const openPlaceSearch = () => {
+    setSearchTerm(selectedLocation?.name ?? '')
+    setSearchError('')
+    setPlaceSearchOpen(true)
+  }
+
+  const closePlaceSearch = () => {
+    setPlaceSearchOpen(false)
+    setSearchTerm('')
+    setSearchResults([])
+    setSearchError('')
+  }
+
+  const handleSelectPlace = (place: PlaceSearchResult) => {
     setSelectedLocation(place)
-    setTitle(place.name)
-    setGooglePlaceId(String(place.placeId))
+    if (!titleTouched) {
+      setTitle(place.name)
+    }
+    closePlaceSearch()
   }
 
   const showToast = (message: string) => {
@@ -309,9 +236,13 @@ export default function PostCreatePage() {
       content: content.trim(),
       imageKeys: boardType === 'FREE' && imageKeys.length ? imageKeys : undefined,
       planId: boardType === 'PLAN_SHARE' && selectedSchedule ? selectedSchedule.tripId : undefined,
+      placeId: boardType === 'PLACE_RECOMMEND' && selectedLocation ? selectedLocation.placeId : undefined,
       placeName: boardType === 'PLACE_RECOMMEND' && selectedLocation ? selectedLocation.name : undefined,
       rating: boardType === 'PLACE_RECOMMEND' ? rating : undefined,
-      googlePlaceId: boardType === 'PLACE_RECOMMEND' ? googlePlaceId || undefined : undefined,
+      googlePlaceId:
+        boardType === 'PLACE_RECOMMEND' && selectedLocation?.googlePlaceId
+          ? selectedLocation.googlePlaceId
+          : undefined,
     }
     try {
       const result = await createPost(payload)
@@ -356,7 +287,7 @@ export default function PostCreatePage() {
             id="post-title"
             type="text"
             value={title}
-            onChange={(event) => setTitle(event.target.value.slice(0, 24))}
+            onChange={handleTitleChange}
             maxLength={24}
             placeholder="제목을 입력하세요 (최대 24자)"
           />
@@ -421,23 +352,25 @@ export default function PostCreatePage() {
 
         {boardType === 'PLACE_RECOMMEND' && (
           <div className="form-group">
-            <label>위치 검색</label>
-            <input
-              type="text"
-              ref={inputRef}
-              value={locationQuery}
-              onChange={(event) => setLocationQuery(event.target.value)}
-              placeholder="위치를 검색하세요"
-            />
-            <div className="location-suggestions">
-              {filteredPlaces.map((place) => (
-                <button type="button" key={place.placeId} onClick={() => handleSelectPlace(place)}>
-                  <span className="location-name">{place.name}</span>
-                  <span className="location-city">{place.city}</span>
-                </button>
-              ))}
+            <label htmlFor="place-search-input">장소 검색</label>
+            <div className="place-search-input-wrapper">
+              <input
+                id="place-search-input"
+                type="text"
+                readOnly
+                value={selectedLocation?.name ?? ''}
+                placeholder="장소를 검색하려면 클릭하세요"
+                onClick={openPlaceSearch}
+              />
+              <button type="button" className="secondary-btn" onClick={openPlaceSearch}>
+                검색
+              </button>
             </div>
-            {selectedLocation && <p className="selected-location">선택 장소: {selectedLocation.name}</p>}
+            {selectedLocation && (
+              <p className="selected-location">
+                {selectedLocation.name} · {selectedLocation.city}
+              </p>
+            )}
             {validation.errors.location && <p className="form-error">{validation.errors.location}</p>}
             <div className="rating">
               {[1, 2, 3, 4, 5].map((value) => (
@@ -498,6 +431,41 @@ export default function PostCreatePage() {
                   <p>작성된 일정이 없습니다.</p>
                 </li>
               )}
+            </ul>
+          </div>
+        </div>
+      )}
+      {placeSearchOpen && (
+        <div className="place-search-modal">
+          <div className="place-search-modal__overlay" onClick={closePlaceSearch} />
+          <div className="place-search-modal__content">
+            <header>
+              <strong>장소 검색</strong>
+              <button type="button" onClick={closePlaceSearch}>
+                ×
+              </button>
+            </header>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="장소 이름 또는 지역을 입력하세요"
+              autoFocus
+            />
+            {searchLoading && <p className="place-search-modal__status">검색 중...</p>}
+            {searchError && <p className="place-search-modal__error">{searchError}</p>}
+            {!searchLoading && !searchError && searchResults.length === 0 && searchTerm && (
+              <p className="place-search-modal__status">검색 결과가 없습니다.</p>
+            )}
+            <ul>
+              {searchResults.map((place) => (
+                <li key={place.placeId}>
+                  <button type="button" onClick={() => handleSelectPlace(place)}>
+                    <strong>{place.name}</strong>
+                    <span>{place.city}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
         </div>

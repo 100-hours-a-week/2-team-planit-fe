@@ -21,7 +21,9 @@ import {
   unlikePost,
 } from '../api/posts'
 import type { CommentItem, PostDetail } from '../api/posts'
+import { getPlaceDetail } from '../api/placeRecommendations'
 import { useAuth } from '../store'
+import type { PlaceDetail } from '../api/placeRecommendations'
 
 const COMMENT_PAGE_SIZE = 20
 const CONTENT_MAX_LENGTH = 1000
@@ -68,6 +70,9 @@ export default function PostDetailPage() {
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
   const [pendingHighlightId, setPendingHighlightId] = useState<number | null>(null)
+  const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null)
+  const [placeLoading, setPlaceLoading] = useState(false)
+  const [placeError, setPlaceError] = useState('')
 
   const showToast = (message: string) => {
     setToastInfo({ message, key: Date.now() })
@@ -78,6 +83,38 @@ export default function PostDetailPage() {
       setToastInfo(null)
     }
   }, [])
+
+  useEffect(() => {
+    if (detail?.boardType !== 'PLACE_RECOMMEND' || !detail.googlePlaceId) {
+      setPlaceDetail(null)
+      setPlaceError('')
+      setPlaceLoading(false)
+      return
+    }
+    let cancelled = false
+    const loadPlaceDetail = async () => {
+      setPlaceLoading(true)
+      setPlaceError('')
+      try {
+        const place = await getPlaceDetail(detail.googlePlaceId)
+        if (!cancelled) {
+          setPlaceDetail(place)
+        }
+      } catch {
+        if (!cancelled) {
+          setPlaceError('장소 정보를 불러오는 데 실패했습니다.')
+        }
+      } finally {
+        if (!cancelled) {
+          setPlaceLoading(false)
+        }
+      }
+    }
+    loadPlaceDetail()
+    return () => {
+      cancelled = true
+    }
+  }, [detail?.boardType, detail?.googlePlaceId])
 
   const fetchCommentPage = useCallback(
     async (pageNumber: number, replace = false, overridePostId?: number) => {
@@ -322,17 +359,16 @@ export default function PostDetailPage() {
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
         handleCloseLightbox()
       }
     }
-    const listener: EventListener = (event) => handleKeyDown(event as unknown as KeyboardEvent)
 
-    window.addEventListener('keydown', listener)
+    window.addEventListener('keydown', handleKeyDown)
     return () => {
       document.body.style.overflow = originalOverflow
-      window.removeEventListener('keydown', listener)
+      window.removeEventListener('keydown', handleKeyDown)
     }
   }, [lightboxImage])
 
@@ -379,6 +415,53 @@ export default function PostDetailPage() {
       {!isLoading && error && <p className="post-status post-status--error">{error}</p>}
       {!isLoading && !error && detail && (
         <>
+          {detail.boardType === 'PLACE_RECOMMEND' && (
+            <section className="place-info-card">
+              <button
+                type="button"
+                className="place-info-card__body"
+                disabled={!placeDetail?.googleMapsUrl}
+                onClick={() => {
+                  if (placeDetail?.googleMapsUrl) {
+                    window.open(placeDetail.googleMapsUrl, '_blank')
+                  }
+                }}
+              >
+                <div className="place-info-card__image">
+                  <img
+                    src={
+                      placeDetail?.photoUrl
+                        ? placeDetail.photoUrl
+                        : DEFAULT_PLAN_THUMBNAIL_URL
+                    }
+                    alt={placeDetail?.name ?? detail.placeName ?? '장소 이미지'}
+                    onError={(event) => {
+                      const target = event.currentTarget
+                      target.onerror = null
+                      target.src = DEFAULT_PLAN_THUMBNAIL_URL
+                    }}
+                  />
+                </div>
+                <div className="place-info-card__content">
+                  <p className="place-info-card__label">추천 장소</p>
+                  <h3>{placeDetail?.name ?? detail.placeName ?? '장소 추천'}</h3>
+                  <p className="place-info-card__meta">
+                    {placeDetail?.city ? `${placeDetail.city}${placeDetail.country ? ` · ${placeDetail.country}` : ''}` : '국가 · 도시 정보 없음'}
+                  </p>
+                  <div className="place-info-card__footer">
+                    <span className="place-info-card__rating">
+                      ★ {detail.userRating ?? '—'}
+                    </span>
+                    <span className="place-info-card__time">
+                      {formatTimeAgo(detail.createdAt)}
+                    </span>
+                  </div>
+                  {placeLoading && <p className="place-info-card__status">정보 로딩 중...</p>}
+                  {placeError && <p className="place-info-card__error">{placeError}</p>}
+                </div>
+              </button>
+            </section>
+          )}
           <section className="post-detail-card">
             <header className="post-detail-header">
               <div className="post-detail-title-row">

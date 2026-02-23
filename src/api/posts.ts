@@ -23,6 +23,7 @@ export interface PostListItem {
   planThumbnailImageUrl?: string | null
   rating?: number | null
   googlePlaceId?: string | null
+  userRating?: number | null
 }
 
 export interface PostDetail {
@@ -63,6 +64,7 @@ export interface PostDetail {
   planThumbnailImageUrl?: string | null
   rating?: number | null
   googlePlaceId?: string | null
+  placeName?: string | null
   tripId?: number | null
   tripTitle?: string | null
   planThumbnailUrl?: string | null
@@ -98,6 +100,7 @@ export interface CreatePostPayload {
   placeName?: string
   rating?: number
   googlePlaceId?: string
+  placeId?: number
 }
 
 export interface UpdatePostPayload {
@@ -109,6 +112,7 @@ export interface UpdatePostPayload {
   placeName?: string
   rating?: number
   googlePlaceId?: string
+  placeId?: number
 }
 
 export interface PresignedUrlResponse {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AuthPageHeader from '../components/AuthPageHeader'
@@ -15,15 +15,31 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-  const loginIdError = loginIdTouched && loginId.length === 0 ? '*아이디를 입력해주세요.' : ''
+  const loginIdError = useMemo(() => {
+    if (!loginIdTouched) {
+      return ''
+    }
+    if (loginId.length === 0) {
+      return '*아이디를 입력해주세요.'
+    }
+    return ''
+  }, [loginId, loginIdTouched])
 
-  const passwordError = passwordTouched
-    ? password.length === 0
-      ? '*비밀번호를 입력해주세요.'
-      : ''
-    : ''
+  const passwordError = useMemo(() => {
+    if (!passwordTouched) {
+      return ''
+    }
+    if (password.length === 0) {
+      return '*비밀번호를 입력해주세요.'
+    }
+    return ''
+  }, [password, passwordTouched])
 
-  const isFormValid = loginIdError === '' && passwordError === '' && loginId.length > 0 && password.length > 0
+  const isFormValid = useMemo(
+    () =>
+      loginIdError === '' && passwordError === '' && loginId.length > 0 && password.length > 0,
+    [loginId, loginIdError, password, passwordError],
+  )
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
