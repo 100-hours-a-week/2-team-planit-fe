@@ -431,6 +431,13 @@ export default function TripCreatePage() {
     }
   }, [page, tripId])
 
+  useEffect(() => {
+    if (isReadonlyTripView) return
+    if (tripData?.isOwner === false) {
+      navigate('/', { replace: true })
+    }
+  }, [isReadonlyTripView, tripData?.isOwner, navigate])
+
   const safeTitle = title.length > 15 ? `${title.slice(0, 15)}...` : title
   const periodLabel = arrivalDate && departureDate ? `${arrivalDate} ~ ${departureDate}` : ''
   const scheduleTitle = tripData?.title?.trim() || safeTitle || '여행 일정'

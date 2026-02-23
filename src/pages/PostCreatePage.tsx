@@ -6,6 +6,7 @@ import type { CreatePostPayload } from '../api/posts'
 import Toast from '../components/Toast'
 import { fetchTrips } from '../api/trips'
 import type { TripListItem } from '../api/trips'
+import PlaceSearchModal from '../components/PlaceSearchModal'
 
 const BOARD_OPTIONS = [
   { value: 'FREE', label: '자유게시판', description: '여행 경험과 사진을 자유롭게 공유해보세요.' },
@@ -24,6 +25,12 @@ type GooglePlaceInfo = {
   formatted_address?: string
 }
 
+type PlaceSuggestion = {
+  placeId: number
+  name: string
+  city: string
+}
+
 type GoogleAutocomplete = {
   getPlace: () => GooglePlaceInfo
   addListener: (event: string, handler: () => void) => { remove: () => void }
@@ -38,40 +45,6 @@ type WindowWithGoogle = Window & typeof globalThis & {
     }
   }
 }
-
-type PlaceSuggestion = {
-  placeId: number
-  name: string
-  city: string
-}
-
-const PLACE_SUGGESTIONS: PlaceSuggestion[] = [
-  { placeId: 201, name: '가오슝', city: '타이완 · 가오슝' },
-  { placeId: 202, name: '괌', city: '미국 · 괌' },
-  { placeId: 203, name: '나고야', city: '일본 · 나고야' },
-  { placeId: 204, name: '나트랑', city: '베트남 · 나트랑' },
-  { placeId: 205, name: '다낭', city: '베트남 · 다낭' },
-  { placeId: 206, name: '도쿄', city: '일본 · 도쿄' },
-  { placeId: 207, name: '런던', city: '영국 · 런던' },
-  { placeId: 208, name: '로마', city: '이탈리아 · 로마' },
-  { placeId: 209, name: '마닐라', city: '필리핀 · 마닐라' },
-  { placeId: 210, name: '마카오', city: '중국 · 마카오' },
-  { placeId: 211, name: '바르셀로나', city: '스페인 · 바르셀로나' },
-  { placeId: 212, name: '방콕', city: '태국 · 방콕' },
-  { placeId: 213, name: '보라카이', city: '필리핀 · 보라카이' },
-  { placeId: 214, name: '보홀', city: '필리핀 · 보홀' },
-  { placeId: 215, name: '사이판', city: '미국 · 사이판' },
-  { placeId: 216, name: '상하이', city: '중국 · 상하이' },
-  { placeId: 217, name: '세부', city: '필리핀 · 세부' },
-  { placeId: 218, name: '싱가포르', city: '싱가포르 · 싱가포르' },
-  { placeId: 219, name: '오사카', city: '일본 · 오사카' },
-  { placeId: 220, name: '오키나와', city: '일본 · 오키나와' },
-  { placeId: 221, name: '파리', city: '프랑스 · 파리' },
-  { placeId: 222, name: '푸꾸옥', city: '베트남 · 푸꾸옥' },
-  { placeId: 223, name: '하노이', city: '베트남 · 하노이' },
-  { placeId: 224, name: '홍콩', city: '홍콩 · 홍콩' },
-  { placeId: 225, name: '후쿠오카', city: '일본 · 후쿠오카' },
-]
 
 function getFileExtension(file: File): string {
   const segments = file.name.toLowerCase().split('.')
@@ -90,7 +63,6 @@ export default function PostCreatePage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [selectedSchedule, setSelectedSchedule] = useState<TripListItem | null>(null)
   const [trips, setTrips] = useState<TripListItem[]>([])
-  const [locationQuery, setLocationQuery] = useState('')
   const [selectedLocation, setSelectedLocation] = useState<PlaceSuggestion | null>(null)
   const [rating, setRating] = useState(0)
   const [googlePlaceId, setGooglePlaceId] = useState('')
@@ -113,7 +85,6 @@ export default function PostCreatePage() {
     }
     if (boardType !== 'PLACE_RECOMMEND') {
       setSelectedLocation(null)
-      setLocationQuery('')
       setRating(0)
       setGooglePlaceId('')
     }
@@ -218,23 +189,12 @@ export default function PostCreatePage() {
         setGooglePlaceId(place.place_id)
         if (place.name) {
           setTitle(place.name)
-          setLocationQuery(place.name)
         }
       })
     return () => {
       listener.remove()
     }
   }, [autocompleteReady])
-
-  const filteredPlaces = useMemo(() => {
-    const query = locationQuery.trim().toLowerCase()
-    if (!query) {
-      return PLACE_SUGGESTIONS
-    }
-    return PLACE_SUGGESTIONS.filter(
-      (item) => item.name.toLowerCase().includes(query) || item.city.toLowerCase().includes(query),
-    )
-  }, [locationQuery])
 
   const handleImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -285,6 +245,8 @@ export default function PostCreatePage() {
       deletePostImageByKey(keyToDelete).catch(() => {})
     }
   }
+
+  const [placeModalOpen, setPlaceModalOpen] = useState(false)
 
   const handleSelectPlace = (place: PlaceSuggestion) => {
     setSelectedLocation(place)
@@ -406,15 +368,15 @@ export default function PostCreatePage() {
             <button type="button" className="secondary-btn" onClick={() => setScheduleModalOpen(true)}>
               일정 선택하기
             </button>
-        {selectedSchedule && (
-          <div className="schedule-summary">
-            <strong>{selectedSchedule.title}</strong>
-            <p>
-              {selectedSchedule.startDate} ~ {selectedSchedule.endDate}
-            </p>
-            <p>{selectedSchedule.travelCity}</p>
-          </div>
-        )}
+            {selectedSchedule && (
+              <div className="schedule-summary">
+                <strong>{selectedSchedule.title}</strong>
+                <p>
+                  {selectedSchedule.startDate} ~ {selectedSchedule.endDate}
+                </p>
+                <p>{selectedSchedule.travelCity}</p>
+              </div>
+            )}
             {validation.errors.schedule && <p className="form-error">{validation.errors.schedule}</p>}
           </div>
         )}
@@ -424,21 +386,14 @@ export default function PostCreatePage() {
             <label>위치 검색</label>
             <input
               type="text"
-              ref={inputRef}
-              value={locationQuery}
-              onChange={(event) => setLocationQuery(event.target.value)}
+              value={selectedLocation?.name || ''}
+              readOnly
               placeholder="위치를 검색하세요"
+              onClick={() => setPlaceModalOpen(true)}
             />
-            <div className="location-suggestions">
-              {filteredPlaces.map((place) => (
-                <button type="button" key={place.placeId} onClick={() => handleSelectPlace(place)}>
-                  <span className="location-name">{place.name}</span>
-                  <span className="location-city">{place.city}</span>
-                </button>
-              ))}
-            </div>
-            {selectedLocation && <p className="selected-location">선택 장소: {selectedLocation.name}</p>}
-            {validation.errors.location && <p className="form-error">{validation.errors.location}</p>}
+            {selectedLocation && (
+              <p className="selected-location">선택 장소: {selectedLocation.name}</p>
+            )}
             <div className="rating">
               {[1, 2, 3, 4, 5].map((value) => (
                 <button
@@ -451,6 +406,7 @@ export default function PostCreatePage() {
                 </button>
               ))}
             </div>
+            {validation.errors.location && <p className="form-error">{validation.errors.location}</p>}
             {validation.errors.rating && <p className="form-error">{validation.errors.rating}</p>}
           </div>
         )}
@@ -464,6 +420,19 @@ export default function PostCreatePage() {
           </button>
         </div>
       </form>
+
+      <PlaceSearchModal
+        open={placeModalOpen}
+        onClose={() => setPlaceModalOpen(false)}
+        onSelect={(place) => {
+          handleSelectPlace({
+            placeId: Number(place.googlePlaceId.replace(/\D/g, '')) || 0,
+            name: place.name,
+            city: place.addressText,
+          })
+          setPlaceModalOpen(false)
+        }}
+      />
 
       {scheduleModalOpen && (
         <div className="schedule-picker">

@@ -16,13 +16,11 @@ const BOARD_TYPE_PARAM_MAP: Record<BoardType, string> = {
   '장소 추천': 'PLACE_RECOMMEND',
 }
 
-const BOARD_TYPE_LABEL_BY_PARAM = Object.entries(BOARD_TYPE_PARAM_MAP).reduce(
-  (acc, [label, param]) => {
-    acc[param] = label
-    return acc
-  },
-  {} as Record<string, BoardType>,
-)
+const BOARD_TYPE_LABEL_BY_PARAM: Record<string, BoardType> = {
+  FREE: '자유 게시판',
+  PLAN_SHARE: '일정 공유',
+  PLACE_RECOMMEND: '장소 추천',
+}
 
 const CITY_CATEGORIES = [
   {
