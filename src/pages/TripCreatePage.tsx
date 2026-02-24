@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   createTrip,
   deleteTrip,
+  fetchTripItineraryJob,
   fetchTripItineraries,
   updateTripDay,
 } from '../api/trips'
@@ -64,6 +65,14 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 })
 const CREATE_ALLOWED_START_HOUR = 14
 const CREATE_ALLOWED_END_HOUR = 2
+const ITINERARY_JOB_POLL_INTERVAL_MS = 3000
+const ITINERARY_JOB_TIMEOUT_MS = 300000
+const BYPASS_CREATE_TIME_LIMIT = (() => {
+  const value = (import.meta.env.VITE_BYPASS_TRIP_CREATE_TIME_LIMIT as string | undefined)
+    ?.trim()
+    .toLowerCase()
+  return value === 'true' || value === '1' || value === 'yes' || value === 'y'
+})()
 
 const DESTINATION_CODE_BY_LABEL: Record<string, string> = {
   '가오슝, 대만': 'KAOHSIUNG_TW',
@@ -231,6 +240,7 @@ export default function TripCreatePage() {
   const requiredReady =
     title.trim().length > 0 &&
     travelCity &&
+    Boolean(DESTINATION_CODE_BY_LABEL[travelCity]) &&
     arrivalDate &&
     departureDate &&
     arrivalHour !== '' &&
@@ -239,8 +249,9 @@ export default function TripCreatePage() {
     themes.length > 0
 
   const currentHour = currentTime.getHours()
-  const isCreateWindowOpen =
+  const isCreateWindowOpenByTime =
     currentHour >= CREATE_ALLOWED_START_HOUR || currentHour < CREATE_ALLOWED_END_HOUR
+  const isCreateWindowOpen = BYPASS_CREATE_TIME_LIMIT || isCreateWindowOpenByTime
 
   const isDirty =
     title ||
@@ -316,6 +327,11 @@ export default function TripCreatePage() {
     setSubmitState({ loading: false, error: '' })
 
     if (!requiredReady) return
+    const destinationCode = DESTINATION_CODE_BY_LABEL[travelCity]
+    if (!destinationCode) {
+      setSubmitState({ loading: false, error: '여행지 코드 매핑에 실패했습니다. 여행지를 다시 선택해주세요.' })
+      return
+    }
 
     const payload = {
       title: title.trim(),
@@ -324,6 +340,7 @@ export default function TripCreatePage() {
       departureDate,
       departureTime: String(departureHour).padStart(2, '0') + ':00',
       travelCity,
+      destinationCode,
       totalBudget: budgetValue,
       travelTheme: themes,
       wantedPlace: wantedPlaces.map((place) => place.googlePlaceId),
@@ -405,29 +422,110 @@ export default function TripCreatePage() {
   }, [currentTripId, showEditMode])
 
   useEffect(() => {
-    let intervalId: ReturnType<typeof window.setInterval> | null = null
+    if (page !== 'creating' || !tripId) return
 
-    const fetchTrip = async () => {
-      if (!tripId) return
-      try {
-        const data = await fetchTripItineraries(tripId)
-        if (data?.itineraries?.length) {
-          setTripData(data)
-          setSelectedDay(data.itineraries[0]?.day || 1)
-          setPage('schedule')
-        }
-      } catch (error) {
-        setSubmitState((prev) => ({ ...prev, error: String(error) }))
+    let isStopped = false
+    let isPollingInFlight = false
+    let intervalId: ReturnType<typeof window.setInterval> | null = null
+    let timeoutId: ReturnType<typeof window.setTimeout> | null = null
+
+    const stopPolling = () => {
+      isStopped = true
+      if (intervalId) {
+        window.clearInterval(intervalId)
+        intervalId = null
+      }
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+        timeoutId = null
       }
     }
 
-    if (page === 'creating' && tripId) {
-      fetchTrip()
-      intervalId = window.setInterval(fetchTrip, 300000)
+    const showToastMessage = (message: string) => {
+      setToast(message)
+      window.setTimeout(() => setToast(''), 2500)
     }
 
+    const recoverToForm = (toastMessage: string, submitError: string) => {
+      if (isStopped) return
+      stopPolling()
+      showToastMessage(toastMessage)
+      setSubmitState({ loading: false, error: submitError })
+      setPage('form')
+    }
+
+    const handleSuccess = async () => {
+      stopPolling()
+      try {
+        const data = await fetchTripItineraries(tripId)
+        if (isStopped) return
+        if (data?.itineraries?.length) {
+          setTripData(data)
+          setSelectedDay(data.itineraries[0]?.day || 1)
+          setSubmitState({ loading: false, error: '' })
+          setPage('schedule')
+          return
+        }
+        recoverToForm(
+          '생성된 일정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+          '생성된 일정을 불러오지 못했습니다.',
+        )
+      } catch {
+        recoverToForm(
+          '일정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+          '일정을 불러오지 못했습니다.',
+        )
+      }
+    }
+
+    const pollItineraryJob = async () => {
+      if (isStopped || isPollingInFlight) return
+      isPollingInFlight = true
+      try {
+        const envelope = await fetchTripItineraryJob(tripId)
+        if (isStopped) return
+        const status = envelope.data?.status
+        if (status === 'SUCCESS') {
+          await handleSuccess()
+          return
+        }
+        if (status === 'FAIL') {
+          const errorMessage = envelope.data?.errorMessage?.trim() || '일정 생성에 실패했습니다. 다시 시도해주세요.'
+          recoverToForm(errorMessage, errorMessage)
+          return
+        }
+        if (status === 'PENDING' || status === 'PROCESSING') {
+          return
+        }
+        recoverToForm('일정 생성 상태를 확인할 수 없습니다. 다시 시도해주세요.', '일정 생성 상태 확인에 실패했습니다.')
+      } catch (error) {
+        const status = (error as { response?: { status?: number } })?.response?.status
+        if (status === 401) {
+          recoverToForm('로그인이 필요합니다. 다시 로그인해주세요.', '로그인이 필요합니다.')
+          return
+        }
+        recoverToForm(
+          '일정 생성 상태 확인에 실패했습니다. 잠시 후 다시 시도해주세요.',
+          '일정 생성 상태 확인에 실패했습니다.',
+        )
+      } finally {
+        isPollingInFlight = false
+      }
+    }
+
+    void pollItineraryJob()
+    intervalId = window.setInterval(() => {
+      void pollItineraryJob()
+    }, ITINERARY_JOB_POLL_INTERVAL_MS)
+    timeoutId = window.setTimeout(() => {
+      recoverToForm(
+        '일정 생성이 지연되고 있어요. 잠시 후 다시 확인해주세요.',
+        '일정 생성이 지연되고 있습니다. 잠시 후 다시 시도해주세요.',
+      )
+    }, ITINERARY_JOB_TIMEOUT_MS)
+
     return () => {
-      if (intervalId) window.clearInterval(intervalId)
+      stopPolling()
     }
   }, [page, tripId])
 
@@ -1008,8 +1106,11 @@ export default function TripCreatePage() {
           >
             입력 완료 &amp; 대기방 입장 →
           </button>
-          {!isCreateWindowOpen && (
+          {!isCreateWindowOpenByTime && !BYPASS_CREATE_TIME_LIMIT && (
             <div className="helper warning">※ 일정 생성은 14:00~02:00에만 가능합니다.</div>
+          )}
+          {travelCity && !DESTINATION_CODE_BY_LABEL[travelCity] && (
+            <div className="helper warning">※ 선택한 여행지의 destinationCode 매핑이 없습니다.</div>
           )}
           {!requiredReady && <div className="helper warning">※ 필수 입력 항목(*)을 모두 입력해주세요.</div>}
           {submitState.error && <div className="helper warning">{submitState.error}</div>}

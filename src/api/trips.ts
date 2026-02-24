@@ -5,6 +5,15 @@ type ApiEnvelope<T> = {
   data?: T
 }
 
+export type ItineraryJobStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAIL'
+
+export interface ItineraryJobResponse {
+  tripId: number
+  status: ItineraryJobStatus
+  errorMessage?: string | null
+  updatedAt?: string
+}
+
 export type TripActivity = {
   activityId?: number
   startTime?: string
@@ -52,6 +61,7 @@ export type CreateTripPayload = {
   departureDate: string
   departureTime: string
   travelCity: string
+  destinationCode: string
   totalBudget: number
   travelTheme: string[]
   wantedPlace: string[]
@@ -65,6 +75,13 @@ export async function createTrip(payload: CreateTripPayload): Promise<TripData> 
 export async function fetchTripItineraries(tripId: number): Promise<TripData> {
   const response = await api.get<ApiEnvelope<TripData>>(`/trips/${tripId}/itineraries`)
   return response.data?.data ?? {}
+}
+
+export async function fetchTripItineraryJob(
+  tripId: number | string,
+): Promise<ApiEnvelope<ItineraryJobResponse>> {
+  const response = await api.get<ApiEnvelope<ItineraryJobResponse>>(`/trips/${tripId}/itinerary-job`)
+  return response.data ?? {}
 }
 
 export async function fetchTrips(): Promise<TripListItem[]> {
