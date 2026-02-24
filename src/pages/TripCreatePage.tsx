@@ -390,16 +390,26 @@ export default function TripCreatePage() {
   useEffect(() => {
     if (!currentTripId) return
 
+    const moveToCreatingPage = () => {
+      setTripId(currentTripId)
+      setSubmitState({ loading: false, error: '' })
+      setPage('creating')
+    }
+
     const fetchMine = async (silent = false) => {
       try {
         const data = await fetchTripItineraries(currentTripId)
         if (data?.itineraries?.length) {
           applyFetchedTripData(data)
         } else if (!silent) {
-          showToast('조회할 일정이 없습니다.')
-          setPage('form')
+          moveToCreatingPage()
         }
       } catch (error) {
+        const status = (error as { response?: { status?: number } })?.response?.status
+        if (!silent && status === 404) {
+          moveToCreatingPage()
+          return
+        }
         if (!silent) {
           console.error('fetchTripItineraries failed', error)
           showToast('일정 조회에 실패했습니다.')
