@@ -68,6 +68,9 @@ export interface PostDetail {
   tripId?: number | null
   tripTitle?: string | null
   planThumbnailUrl?: string | null
+  placeImageUrl?: string | null
+  city?: string | null
+  country?: string | null
 }
 
 export interface CommentItem {

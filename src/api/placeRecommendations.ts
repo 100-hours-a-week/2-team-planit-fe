@@ -4,6 +4,7 @@ export interface PlaceSearchResult {
   googlePlaceId: string
   name: string
   addressText: string
+  city?: string
 }
 
 const BASE_PATH = '/place-recommendations'

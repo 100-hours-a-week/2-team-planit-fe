@@ -9,6 +9,7 @@ import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import { resolveImageUrl } from '../utils/image'
 import { fetchTrips } from '../api/trips'
 import type { TripListItem } from '../api/trips'
+import type { PlaceSearchResult } from '../api/placeRecommendations'
 
 const PLACE_SUGGESTIONS = [
   { name: '괌', city: '미국 · 괌' },
@@ -54,7 +55,7 @@ export default function PostEditPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; content?: string; schedule?: string; location?: string; rating?: string }>({})
   const [locationQuery, setLocationQuery] = useState('')
-  const [selectedLocation, setSelectedLocation] = useState<{ name: string; city: string; googlePlaceId?: string } | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<PlaceSearchResult | null>(null)
   const [rating, setRating] = useState(0)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [removedKeys, setRemovedKeys] = useState<string[]>([])
@@ -174,8 +175,17 @@ export default function PostEditPage() {
           : 'FREE')
     setBoardType(mappedType)
     if (mappedType === 'PLACE_RECOMMEND') {
-      setSelectedLocation(detail.placeName ? { name: detail.placeName, city: detail.placeName, googlePlaceId: '' } : null)
-      setRating(0)
+      setSelectedLocation(
+        detail.placeName
+          ? {
+              googlePlaceId: detail.googlePlaceId ?? '',
+              name: detail.placeName,
+              addressText: detail.placeName,
+              city: detail.city ?? detail.placeName,
+            }
+          : null,
+      )
+      setRating(detail.userRating ?? detail.rating ?? 0)
       setLocationQuery(detail.placeName ?? '')
     }
   }, [detail, detail?.boardType, detail?.boardName, detail?.placeName])
@@ -298,7 +308,12 @@ export default function PostEditPage() {
   }, [locationQuery])
 
   const handleSelectPlace = (place: (typeof PLACE_SUGGESTIONS)[number]) => {
-    setSelectedLocation({ name: place.name, city: place.city, googlePlaceId: '' })
+    setSelectedLocation({
+      googlePlaceId: '',
+      name: place.name,
+      addressText: place.city,
+      city: place.city,
+    })
     setLocationQuery(place.name)
   }
 
