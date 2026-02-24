@@ -1,4 +1,5 @@
 ## 작업일지
+- 2026-02-14: 생성 대기 중인 trip 재진입 시 `GET /trips/{id}/itineraries`가 비어있거나 404여도 form으로 내리지 않고 creating 페이지로 유지해 `/itinerary-job` 폴링을 계속 타도록 TripCreatePage 조회 분기를 보강함.
 - 2026-02-14: 일정 생성 비동기 전환에 맞춰 `fetchTripItineraryJob` API를 추가하고 TripCreatePage의 creating 단계를 `/trips/{tripId}/itinerary-job` 3초 폴링 + 5분 타임아웃으로 교체해 SUCCESS/FAIL/401 처리 후 schedule/form 전환을 제어하도록 수정함.
 - 2026-02-14: MyPage의 구 `/plans?mine=true` 호출(fetchPlans/deletePlan 및 관련 effect/state/modal)을 제거하고, 마이페이지는 `getMyPage` + `fetchTrips` 경로만 사용하도록 정리해 noResourceFound 예외를 방지함.
 - 2026-02-14: 일정 생성 요청 payload에 `destinationCode`를 포함하도록 TripCreatePage/createTrip 타입을 수정하고, 매핑 누락 시 제출 차단 및 경고를 추가해 백엔드 `@NotNull destinationCode` 검증 오류를 방지함.
