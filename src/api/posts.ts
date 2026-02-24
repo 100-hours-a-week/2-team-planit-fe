@@ -102,6 +102,7 @@ export interface CreatePostPayload {
   planId?: number
   placeName?: string
   rating?: number
+  userRating?: number
   googlePlaceId?: string
 }
 
@@ -113,6 +114,7 @@ export interface UpdatePostPayload {
   planId?: number
   placeName?: string
   rating?: number
+  userRating?: number
   googlePlaceId?: string
 }
 

@@ -26,7 +26,7 @@ type GooglePlaceInfo = {
 }
 
 type PlaceSuggestion = {
-  placeId: number
+  placeId: string
   name: string
   city: string
 }
@@ -176,21 +176,21 @@ export default function PostCreatePage() {
     const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
       fields: ['place_id', 'name', 'formatted_address'],
     })
-      const listener = autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace()
-        if (!place.place_id) {
-          return
-        }
-        setSelectedLocation({
-          placeId: Number(place.place_id.replace(/\D/g, '')) || 0,
-          name: place.name ?? '',
-          city: place.formatted_address ?? '',
-        })
-        setGooglePlaceId(place.place_id)
-        if (place.name) {
-          setTitle(place.name)
-        }
-      })
+    const listener = autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace()
+      if (!place.place_id) {
+        return
+      }
+    setSelectedLocation({
+      placeId: place.place_id,
+      name: place.name ?? '',
+      city: place.formatted_address ?? '',
+    })
+      setGooglePlaceId(place.place_id)
+      if (place.name) {
+        setTitle(place.name)
+      }
+    })
     return () => {
       listener.remove()
     }
@@ -250,8 +250,10 @@ export default function PostCreatePage() {
 
   const handleSelectPlace = (place: PlaceSuggestion) => {
     setSelectedLocation(place)
-    setTitle(place.name)
-    setGooglePlaceId(String(place.placeId))
+    if (place.name) {
+      setTitle(place.name)
+    }
+    setGooglePlaceId(place.placeId)
   }
 
   const showToast = (message: string) => {
@@ -260,8 +262,12 @@ export default function PostCreatePage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!validation.valid) {
+    if (!validation.valid || (boardType === 'PLACE_RECOMMEND' && rating <= 0)) {
       showToast('*모든 필수 항목을 채운 후 등록해주세요.')
+      return
+    }
+    if (boardType === 'PLACE_RECOMMEND' && rating <= 0) {
+      showToast('*별점을 선택해주세요.')
       return
     }
     setIsSubmitting(true)
@@ -272,7 +278,7 @@ export default function PostCreatePage() {
       imageKeys: boardType === 'FREE' && imageKeys.length ? imageKeys : undefined,
       planId: boardType === 'PLAN_SHARE' && selectedSchedule ? selectedSchedule.tripId : undefined,
       placeName: boardType === 'PLACE_RECOMMEND' && selectedLocation ? selectedLocation.name : undefined,
-      rating: boardType === 'PLACE_RECOMMEND' ? rating : undefined,
+      userRating: boardType === 'PLACE_RECOMMEND' ? rating : undefined,
       googlePlaceId: boardType === 'PLACE_RECOMMEND' ? googlePlaceId || undefined : undefined,
     }
     try {
@@ -425,8 +431,12 @@ export default function PostCreatePage() {
         open={placeModalOpen}
         onClose={() => setPlaceModalOpen(false)}
         onSelect={(place) => {
+          const googleId = place.googlePlaceId ?? place.placeId
+          if (!googleId) {
+            return
+          }
           handleSelectPlace({
-            placeId: Number(place.googlePlaceId.replace(/\D/g, '')) || 0,
+            placeId: googleId,
             name: place.name,
             city: place.addressText,
           })
