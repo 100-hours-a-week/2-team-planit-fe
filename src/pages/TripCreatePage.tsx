@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   createTrip,
   deleteTrip,
+  fetchTripItineraryJob,
   fetchTripItineraries,
   updateTripDay,
 } from '../api/trips'
@@ -64,6 +65,14 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 })
 const CREATE_ALLOWED_START_HOUR = 14
 const CREATE_ALLOWED_END_HOUR = 2
+const ITINERARY_JOB_POLL_INTERVAL_MS = 3000
+const ITINERARY_JOB_TIMEOUT_MS = 300000
+const BYPASS_CREATE_TIME_LIMIT = (() => {
+  const value = (import.meta.env.VITE_BYPASS_TRIP_CREATE_TIME_LIMIT as string | undefined)
+    ?.trim()
+    .toLowerCase()
+  return value === 'true' || value === '1' || value === 'yes' || value === 'y'
+})()
 
 const DESTINATION_CODE_BY_LABEL: Record<string, string> = {
   '가오슝, 대만': 'KAOHSIUNG_TW',
@@ -145,6 +154,12 @@ type ActivityDraft = {
   startTime?: string
 }
 
+type TripRouteState = {
+  tripId?: number
+  tripData?: TripData
+  readonly?: boolean
+}
+
 const getApiErrorCode = (error: unknown) =>
   (error as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
 
@@ -183,12 +198,23 @@ export default function TripCreatePage() {
   const showWantedPlaceSection = true
 
   const routeTripId = Number(params.tripId)
-  const stateTripId = Number((location.state as { tripId?: number } | null)?.tripId)
+  const locationState = (location.state as TripRouteState | null) ?? null
+  const stateTripId = Number(locationState?.tripId)
+  const queryReadonly = new URLSearchParams(location.search).get('readonly') === 'true'
+  const isReadonlyTripView = queryReadonly || Boolean(locationState?.readonly)
   const currentTripId = Number.isFinite(routeTripId) && routeTripId > 0
     ? routeTripId
     : Number.isFinite(stateTripId) && stateTripId > 0
       ? stateTripId
       : null
+
+  const handlePrimaryHeaderAction = () => {
+    if (isReadonlyTripView) {
+      navigate(-1)
+      return
+    }
+    navigate('/')
+  }
 
   const applyFetchedTripData = (data: TripData) => {
     setTripData(data)
@@ -214,6 +240,7 @@ export default function TripCreatePage() {
   const requiredReady =
     title.trim().length > 0 &&
     travelCity &&
+    Boolean(DESTINATION_CODE_BY_LABEL[travelCity]) &&
     arrivalDate &&
     departureDate &&
     arrivalHour !== '' &&
@@ -222,8 +249,9 @@ export default function TripCreatePage() {
     themes.length > 0
 
   const currentHour = currentTime.getHours()
-  const isCreateWindowOpen =
+  const isCreateWindowOpenByTime =
     currentHour >= CREATE_ALLOWED_START_HOUR || currentHour < CREATE_ALLOWED_END_HOUR
+  const isCreateWindowOpen = BYPASS_CREATE_TIME_LIMIT || isCreateWindowOpenByTime
 
   const isDirty =
     title ||
@@ -299,6 +327,11 @@ export default function TripCreatePage() {
     setSubmitState({ loading: false, error: '' })
 
     if (!requiredReady) return
+    const destinationCode = DESTINATION_CODE_BY_LABEL[travelCity]
+    if (!destinationCode) {
+      setSubmitState({ loading: false, error: '여행지 코드 매핑에 실패했습니다. 여행지를 다시 선택해주세요.' })
+      return
+    }
 
     const payload = {
       title: title.trim(),
@@ -307,6 +340,7 @@ export default function TripCreatePage() {
       departureDate,
       departureTime: String(departureHour).padStart(2, '0') + ':00',
       travelCity,
+      destinationCode,
       totalBudget: budgetValue,
       travelTheme: themes,
       wantedPlace: wantedPlaces.map((place) => place.googlePlaceId),
@@ -348,14 +382,20 @@ export default function TripCreatePage() {
   }, [])
 
   useEffect(() => {
-    const stateTripData = (location.state as { tripData?: TripData } | null)?.tripData
+    const stateTripData = locationState?.tripData
     if (stateTripData?.itineraries?.length) {
       applyFetchedTripData(stateTripData)
     }
-  }, [location.state])
+  }, [locationState?.tripData])
 
   useEffect(() => {
     if (!currentTripId) return
+
+    const moveToCreatingPage = () => {
+      setTripId(currentTripId)
+      setSubmitState({ loading: false, error: '' })
+      setPage('creating')
+    }
 
     const fetchMine = async (silent = false) => {
       try {
@@ -363,10 +403,14 @@ export default function TripCreatePage() {
         if (data?.itineraries?.length) {
           applyFetchedTripData(data)
         } else if (!silent) {
-          showToast('조회할 일정이 없습니다.')
-          setPage('form')
+          moveToCreatingPage()
         }
       } catch (error) {
+        const status = (error as { response?: { status?: number } })?.response?.status
+        if (!silent && status === 404) {
+          moveToCreatingPage()
+          return
+        }
         if (!silent) {
           console.error('fetchTripItineraries failed', error)
           showToast('일정 조회에 실패했습니다.')
@@ -388,31 +432,119 @@ export default function TripCreatePage() {
   }, [currentTripId, showEditMode])
 
   useEffect(() => {
-    let intervalId: ReturnType<typeof window.setInterval> | null = null
+    if (page !== 'creating' || !tripId) return
 
-    const fetchTrip = async () => {
-      if (!tripId) return
-      try {
-        const data = await fetchTripItineraries(tripId)
-        if (data?.itineraries?.length) {
-          setTripData(data)
-          setSelectedDay(data.itineraries[0]?.day || 1)
-          setPage('schedule')
-        }
-      } catch (error) {
-        setSubmitState((prev) => ({ ...prev, error: String(error) }))
+    let isStopped = false
+    let isPollingInFlight = false
+    let intervalId: ReturnType<typeof window.setInterval> | null = null
+    let timeoutId: ReturnType<typeof window.setTimeout> | null = null
+
+    const stopPolling = () => {
+      isStopped = true
+      if (intervalId) {
+        window.clearInterval(intervalId)
+        intervalId = null
+      }
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+        timeoutId = null
       }
     }
 
-    if (page === 'creating' && tripId) {
-      fetchTrip()
-      intervalId = window.setInterval(fetchTrip, 300000)
+    const showToastMessage = (message: string) => {
+      setToast(message)
+      window.setTimeout(() => setToast(''), 2500)
     }
 
+    const recoverToForm = (toastMessage: string, submitError: string) => {
+      if (isStopped) return
+      stopPolling()
+      showToastMessage(toastMessage)
+      setSubmitState({ loading: false, error: submitError })
+      setPage('form')
+    }
+
+    const handleSuccess = async () => {
+      stopPolling()
+      try {
+        const data = await fetchTripItineraries(tripId)
+        if (isStopped) return
+        if (data?.itineraries?.length) {
+          setTripData(data)
+          setSelectedDay(data.itineraries[0]?.day || 1)
+          setSubmitState({ loading: false, error: '' })
+          setPage('schedule')
+          return
+        }
+        recoverToForm(
+          '생성된 일정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+          '생성된 일정을 불러오지 못했습니다.',
+        )
+      } catch {
+        recoverToForm(
+          '일정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+          '일정을 불러오지 못했습니다.',
+        )
+      }
+    }
+
+    const pollItineraryJob = async () => {
+      if (isStopped || isPollingInFlight) return
+      isPollingInFlight = true
+      try {
+        const envelope = await fetchTripItineraryJob(tripId)
+        if (isStopped) return
+        const status = envelope.data?.status
+        if (status === 'SUCCESS') {
+          await handleSuccess()
+          return
+        }
+        if (status === 'FAIL') {
+          const errorMessage = envelope.data?.errorMessage?.trim() || '일정 생성에 실패했습니다. 다시 시도해주세요.'
+          recoverToForm(errorMessage, errorMessage)
+          return
+        }
+        if (status === 'PENDING' || status === 'PROCESSING') {
+          return
+        }
+        recoverToForm('일정 생성 상태를 확인할 수 없습니다. 다시 시도해주세요.', '일정 생성 상태 확인에 실패했습니다.')
+      } catch (error) {
+        const status = (error as { response?: { status?: number } })?.response?.status
+        if (status === 401) {
+          recoverToForm('로그인이 필요합니다. 다시 로그인해주세요.', '로그인이 필요합니다.')
+          return
+        }
+        recoverToForm(
+          '일정 생성 상태 확인에 실패했습니다. 잠시 후 다시 시도해주세요.',
+          '일정 생성 상태 확인에 실패했습니다.',
+        )
+      } finally {
+        isPollingInFlight = false
+      }
+    }
+
+    void pollItineraryJob()
+    intervalId = window.setInterval(() => {
+      void pollItineraryJob()
+    }, ITINERARY_JOB_POLL_INTERVAL_MS)
+    timeoutId = window.setTimeout(() => {
+      recoverToForm(
+        '일정 생성이 지연되고 있어요. 잠시 후 다시 확인해주세요.',
+        '일정 생성이 지연되고 있습니다. 잠시 후 다시 시도해주세요.',
+      )
+    }, ITINERARY_JOB_TIMEOUT_MS)
+
     return () => {
-      if (intervalId) window.clearInterval(intervalId)
+      stopPolling()
     }
   }, [page, tripId])
+
+  useEffect(() => {
+    if (isReadonlyTripView) return
+    if (tripData?.isOwner === false) {
+      navigate('/', { replace: true })
+    }
+  }, [isReadonlyTripView, tripData?.isOwner, navigate])
 
   const safeTitle = title.length > 15 ? `${title.slice(0, 15)}...` : title
   const periodLabel = arrivalDate && departureDate ? `${arrivalDate} ~ ${departureDate}` : ''
@@ -440,8 +572,8 @@ export default function TripCreatePage() {
                 <h1>{safeTitle || '일정 생성중'}</h1>
                 {periodLabel && <p>{periodLabel}</p>}
               </div>
-              <button className="pill-button" onClick={() => navigate('/')}>
-                홈으로
+              <button className="pill-button" onClick={handlePrimaryHeaderAction}>
+                {isReadonlyTripView ? '뒤로가기' : '홈으로'}
               </button>
             </header>
             <div className="creating-body">
@@ -473,130 +605,150 @@ export default function TripCreatePage() {
               {schedulePeriod && <p>{schedulePeriod}</p>}
             </div>
             <div className="day-actions">
-              <button
-                className="pill-button"
-                disabled={!currentTripId || tripData?.isOwner === false}
-                onClick={async () => {
-                  if (!currentTripId) return
-                  try {
-                    await deleteTrip(currentTripId)
-                    showToast('일정이 삭제되었습니다.')
-                    navigate('/')
-                  } catch (error) {
-                    console.error('deleteTrip failed', error)
-                    showToast('일정 삭제에 실패했습니다.')
-                  }
-                }}
-              >
-                일정 삭제
-              </button>
-              <button
-                className="pill-button"
-                disabled={tripData?.isOwner === false}
-                onClick={async () => {
-                  if (!showEditMode) {
-                    const drafts: Record<number, ActivityDraft> = {}
-                    sortedActivities.forEach((activity) => {
-                      if (!activity.activityId) return
-                      drafts[activity.activityId] = {
-                        placeName: activity.placeName ?? '',
-                        memo: activity.memo ?? '',
-                        cost: activity.cost != null ? String(activity.cost) : '',
-                        startTime: activity.startTime ?? '',
+              {!isReadonlyTripView && (
+                <>
+                  <button
+                    className="pill-button"
+                    disabled={!currentTripId || (!isReadonlyTripView && tripData?.isOwner === false)}
+                    onClick={async () => {
+                      if (!currentTripId) return
+                      try {
+                        await deleteTrip(currentTripId)
+                        showToast('일정이 삭제되었습니다.')
+                        navigate('/')
+                      } catch (error) {
+                        console.error('deleteTrip failed', error)
+                        showToast('일정 삭제에 실패했습니다.')
                       }
-                    })
-                    setEditDrafts(drafts)
-                    setShowEditMode(true)
-                    return
-                  }
+                    }}
+                  >
+                    일정 삭제
+                  </button>
+                  <button
+                    className="pill-button"
+                    disabled={!isReadonlyTripView && tripData?.isOwner === false}
+                    onClick={async () => {
+                      if (!showEditMode) {
+                        const drafts: Record<number, ActivityDraft> = {}
+                        sortedActivities.forEach((activity) => {
+                          if (!activity.activityId) return
+                          drafts[activity.activityId] = {
+                            placeName: activity.placeName ?? '',
+                            memo: activity.memo ?? '',
+                            cost: activity.cost != null ? String(activity.cost) : '',
+                            startTime: activity.startTime ?? '',
+                          }
+                        })
+                        setEditDrafts(drafts)
+                        setShowEditMode(true)
+                        return
+                      }
 
-                  if (!Number.isFinite(dayId) || dayId <= 0) {
-                    showToast('일정 정보가 없어 수정할 수 없습니다.')
-                    return
-                  }
-                  if (!currentTripId) {
-                    showToast('여행 정보가 없어 수정할 수 없습니다.')
-                    return
-                  }
+                      if (!Number.isFinite(dayId) || dayId <= 0) {
+                        showToast('일정 정보가 없어 수정할 수 없습니다.')
+                        return
+                      }
+                      if (!currentTripId) {
+                        showToast('여행 정보가 없어 수정할 수 없습니다.')
+                        return
+                      }
 
-                  const updates = sortedActivities.reduce((acc, activity) => {
-                    if (!activity.activityId) return acc
-                    const draft = editDrafts[activity.activityId]
-                    if (!draft) return acc
+                      const updates = sortedActivities.reduce(
+                        (acc, activity) => {
+                          if (!activity.activityId) return acc
+                          const draft = editDrafts[activity.activityId]
+                          if (!draft) return acc
 
-                    const trimmedPlace = draft.placeName?.trim()
-                    const trimmedMemo = draft.memo?.trim()
-                    const nextCost =
-                      draft.cost && draft.cost.trim() !== ''
-                        ? Number.parseInt(draft.cost, 10)
-                        : undefined
+                          const trimmedPlace = draft.placeName?.trim()
+                          const trimmedMemo = draft.memo?.trim()
+                          const nextCost =
+                            draft.cost && draft.cost.trim() !== ''
+                              ? Number.parseInt(draft.cost, 10)
+                              : undefined
 
-                    const changes: {
-                      activityId: number
-                      placeName?: string
-                      memo?: string
-                      cost?: number
-                      startTime?: string
-                    } = { activityId: activity.activityId }
+                          const changes: {
+                            activityId: number
+                            placeName?: string
+                            memo?: string
+                            cost?: number
+                            startTime?: string
+                          } = { activityId: activity.activityId }
 
-                    if (trimmedPlace && trimmedPlace !== (activity.placeName ?? '')) {
-                      changes.placeName = trimmedPlace
-                    }
-                    if (trimmedMemo && trimmedMemo !== (activity.memo ?? '')) {
-                      changes.memo = trimmedMemo
-                    }
-                    if (
-                      typeof nextCost === 'number' &&
-                      Number.isFinite(nextCost) &&
-                      nextCost !== activity.cost
-                    ) {
-                      changes.cost = nextCost
-                    }
-                    if (draft.startTime && draft.startTime !== (activity.startTime ?? '')) {
-                      changes.startTime = draft.startTime
-                    }
+                          if (trimmedPlace && trimmedPlace !== (activity.placeName ?? '')) {
+                            changes.placeName = trimmedPlace
+                          }
+                          if (trimmedMemo && trimmedMemo !== (activity.memo ?? '')) {
+                            changes.memo = trimmedMemo
+                          }
+                          if (
+                            typeof nextCost === 'number' &&
+                            Number.isFinite(nextCost) &&
+                            nextCost !== activity.cost
+                          ) {
+                            changes.cost = nextCost
+                          }
+                          if (draft.startTime && draft.startTime !== (activity.startTime ?? '')) {
+                            changes.startTime = draft.startTime
+                          }
 
-                    const keys = Object.keys(changes)
-                    if (keys.length > 1) {
-                      acc.push(changes)
-                    }
-                    return acc
-                  }, [] as { activityId: number; placeName?: string; memo?: string; cost?: number; startTime?: string }[])
+                          const keys = Object.keys(changes)
+                          if (keys.length > 1) {
+                            acc.push(changes)
+                          }
+                          return acc
+                        },
+                        [] as {
+                          activityId: number
+                          placeName?: string
+                          memo?: string
+                          cost?: number
+                          startTime?: string
+                        }[],
+                      )
 
-                  if (updates.length === 0) {
-                    showToast('변경된 내용이 없습니다.')
-                    setShowEditMode(false)
-                    setEditDrafts({})
-                    return
-                  }
+                      if (updates.length === 0) {
+                        showToast('변경된 내용이 없습니다.')
+                        setShowEditMode(false)
+                        setEditDrafts({})
+                        return
+                      }
 
-                  try {
-                    await updateTripDay(currentTripId, dayId, updates)
-                    showToast('일정이 수정되었습니다.')
-                    setShowEditMode(false)
-                    setEditDrafts({})
-                    const latestData = await fetchTripItineraries(currentTripId)
-                    if (latestData?.itineraries?.length) {
-                      applyFetchedTripData(latestData)
-                    }
-                  } catch (error) {
-                    console.error('final updateTripDay catch', error)
-                    showToast('일정 수정에 실패했습니다.')
-                  }
-                }}
-              >
-                {showEditMode ? '수정 완료' : '일정 수정'}
-              </button>
-              <button className="pill-button" onClick={() => navigate('/')}>
-                홈으로
+                      try {
+                        await updateTripDay(currentTripId, dayId, updates)
+                        showToast('일정이 수정되었습니다.')
+                        setShowEditMode(false)
+                        setEditDrafts({})
+                        const latestData = await fetchTripItineraries(currentTripId)
+                        if (latestData?.itineraries?.length) {
+                          applyFetchedTripData(latestData)
+                        }
+                      } catch (error) {
+                        console.error('final updateTripDay catch', error)
+                        showToast('일정 수정에 실패했습니다.')
+                      }
+                    }}
+                  >
+                    {showEditMode ? '수정 완료' : '일정 수정'}
+                  </button>
+                </>
+              )}
+              <button className="pill-button" onClick={handlePrimaryHeaderAction}>
+                {isReadonlyTripView ? '뒤로가기' : '홈으로'}
               </button>
             </div>
           </header>
           {toast && <div className="toast">{toast}</div>}
 
           <div className="tab-row">
-            <button className="tab active">일정</button>
-            <button className="tab">
+            <button className="tab active" type="button">
+              일정
+            </button>
+            <button
+              type="button"
+              className={`tab${isReadonlyTripView ? ' disabled' : ''}`}
+              disabled={isReadonlyTripView}
+              aria-disabled={isReadonlyTripView}
+            >
               채팅
               {hasNewChat && <span className="badge" />}
             </button>
@@ -624,8 +776,15 @@ export default function TripCreatePage() {
             <div className="day-label">Day {selectedDay}</div>
             <div className="day-actions">
               <button
-                className="pill-button"
-                onClick={() => showToast('미지원 기능입니다.')}
+                type="button"
+                className={`pill-button${isReadonlyTripView ? ' disabled' : ''}`}
+                disabled={isReadonlyTripView}
+                onClick={() => {
+                  if (isReadonlyTripView) {
+                    return
+                  }
+                  showToast('미지원 기능입니다.')
+                }}
               >
                 일정 재생성
               </button>
@@ -957,8 +1116,11 @@ export default function TripCreatePage() {
           >
             입력 완료 &amp; 대기방 입장 →
           </button>
-          {!isCreateWindowOpen && (
+          {!isCreateWindowOpenByTime && !BYPASS_CREATE_TIME_LIMIT && (
             <div className="helper warning">※ 일정 생성은 14:00~02:00에만 가능합니다.</div>
+          )}
+          {travelCity && !DESTINATION_CODE_BY_LABEL[travelCity] && (
+            <div className="helper warning">※ 선택한 여행지의 destinationCode 매핑이 없습니다.</div>
           )}
           {!requiredReady && <div className="helper warning">※ 필수 입력 항목(*)을 모두 입력해주세요.</div>}
           {submitState.error && <div className="helper warning">{submitState.error}</div>}

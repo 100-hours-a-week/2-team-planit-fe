@@ -16,11 +16,19 @@ export interface PostListItem {
   rankingScore?: number | null
   placeName?: string | null
   tripTitle?: string | null
+  planId?: number | null
+  planTitle?: string | null
+  planStartDate?: string | null
+  planEndDate?: string | null
+  planThumbnailImageUrl?: string | null
+  rating?: number | null
+  googlePlaceId?: string | null
 }
 
 export interface PostDetail {
   postId: number
   boardName: string
+  boardType: string
   boardDescription: string
   title: string
   content: string
@@ -48,6 +56,18 @@ export interface PostDetail {
     deletable: boolean
   }[]
   editable: boolean
+  planId?: number | null
+  planTitle?: string | null
+  planStartDate?: string | null
+  planEndDate?: string | null
+  planThumbnailImageUrl?: string | null
+  rating?: number | null
+  googlePlaceId?: string | null
+  placeName?: string | null
+  userRating?: number | null
+  tripId?: number | null
+  tripTitle?: string | null
+  planThumbnailUrl?: string | null
 }
 
 export interface CommentItem {
@@ -60,10 +80,12 @@ export interface CommentItem {
   deletable: boolean
 }
 
-export interface CommentPageResponse {
-  comments: CommentItem[]
-  hasMore: boolean
-}
+export type CommentPageResponse = {
+  comments?: CommentItem[]
+  content?: CommentItem[]
+  hasMore?: boolean
+  last?: boolean
+} | CommentItem[]
 
 export interface CreateCommentPayload {
   content: string
@@ -72,14 +94,23 @@ export interface CreateCommentPayload {
 export interface CreatePostPayload {
   title: string
   content: string
-  boardType: string
   imageKeys?: string[]
+  boardType: string
+  planId?: number
+  placeName?: string
+  rating?: number
+  googlePlaceId?: string
 }
 
 export interface UpdatePostPayload {
   title?: string
   content?: string
   imageKeys?: string[]
+  boardType?: string
+  planId?: number
+  placeName?: string
+  rating?: number
+  googlePlaceId?: string
 }
 
 export interface PresignedUrlResponse {
@@ -91,8 +122,10 @@ export interface PresignedUrlResponse {
 const BASE_PATH = '/posts'
 
 export interface PostListResponse {
-  posts: PostListItem[]
-  hasMore: boolean
+  items: PostListItem[]
+  hasNext?: boolean
+  page?: number
+  size?: number
 }
 
 export interface GetPostsParams {
@@ -101,6 +134,7 @@ export interface GetPostsParams {
   sort?: SortParam
   page?: number
   size?: number
+  city?: string
 }
 
 export async function getPosts(params?: GetPostsParams): Promise<PostListResponse> {

@@ -1,4 +1,9 @@
 ## 작업일지
+- 2026-02-14: 생성 대기 중인 trip 재진입 시 `GET /trips/{id}/itineraries`가 비어있거나 404여도 form으로 내리지 않고 creating 페이지로 유지해 `/itinerary-job` 폴링을 계속 타도록 TripCreatePage 조회 분기를 보강함.
+- 2026-02-14: 일정 생성 비동기 전환에 맞춰 `fetchTripItineraryJob` API를 추가하고 TripCreatePage의 creating 단계를 `/trips/{tripId}/itinerary-job` 3초 폴링 + 5분 타임아웃으로 교체해 SUCCESS/FAIL/401 처리 후 schedule/form 전환을 제어하도록 수정함.
+- 2026-02-14: MyPage의 구 `/plans?mine=true` 호출(fetchPlans/deletePlan 및 관련 effect/state/modal)을 제거하고, 마이페이지는 `getMyPage` + `fetchTrips` 경로만 사용하도록 정리해 noResourceFound 예외를 방지함.
+- 2026-02-14: 일정 생성 요청 payload에 `destinationCode`를 포함하도록 TripCreatePage/createTrip 타입을 수정하고, 매핑 누락 시 제출 차단 및 경고를 추가해 백엔드 `@NotNull destinationCode` 검증 오류를 방지함.
+- 2026-02-14: `VITE_BYPASS_TRIP_CREATE_TIME_LIMIT` 스위치를 추가해 로컬 개발(`.env.development`)에서 일정 생성 14:00~02:00 제한/경고를 우회할 수 있도록 TripCreatePage 로직을 확장함.
 - 2026-02-05: 로그인 페이지 아이디 입력 중 조건 안내를 제거하고 입력이 없을 때만 `*아이디를 입력해주세요.` 오류만 보여주도록 정리함.
 - 2026-02-04: `/src/api/axios.ts` 요청 인터셉터를 로그인/회원가입은 제외하도록 수정해 `/auth/login`, `/users/signup` 요청에 Authorization 헤더가 붙지 않게 함.
 - 2026-02-04: 로컬 개발 시 `VITE_API_BASE_URL=http://localhost:8080/api`를 `.env.local`에 정의하고 axios가 환경변수를 우선 읽도록 변경해 dev 서버에서 localhost API를 호출하게 함.

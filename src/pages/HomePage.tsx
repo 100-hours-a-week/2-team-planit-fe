@@ -177,10 +177,6 @@ export default function HomePage() {
   }
 
   const handleBoardTypeClick = (type: BoardType) => {
-    if (type !== '자유 게시판') {
-      showUnsupportedToast()
-      return
-    }
     setSelectedBoardType(type)
   }
 
@@ -211,7 +207,7 @@ export default function HomePage() {
         if (cancelled) {
           return
         }
-        setRecentPosts(response.posts)
+        setRecentPosts(response.items ?? [])
       } catch {
         if (cancelled) {
           return

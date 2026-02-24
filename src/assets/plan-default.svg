@@ -1,0 +1,17 @@
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="600" rx="40" fill="#F3F4F8" />
+  <defs>
+    <linearGradient id="pinGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FF7A6F" />
+      <stop offset="100%" stop-color="#FF4B4B" />
+    </linearGradient>
+  </defs>
+  <path d="M400 150c-35 0-64 29-64 64 0 35 64 150 64 150s64-114 64-150c0-35-29-64-64-64z" fill="url(#pinGradient)" />
+  <circle cx="400" cy="214" r="28" fill="#FFE3E1" />
+  <text x="400" y="360" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-size="88" font-weight="700" letter-spacing="0.3em" fill="#1E1F2A">
+    PLANIT
+  </text>
+  <text x="400" y="420" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-size="28" fill="#6C6F85" letter-spacing="0.2em">
+    TRAVEL STORIES
+  </text>
+</svg>

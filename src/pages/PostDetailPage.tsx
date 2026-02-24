@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { DEFAULT_PLAN_THUMBNAIL_URL } from '../constants/plan'
 import { resolveImageUrl } from '../utils/image.ts'
 import {
   createComment,
@@ -21,8 +22,10 @@ import {
 } from '../api/posts'
 import type { CommentItem, PostDetail } from '../api/posts'
 import { useAuth } from '../store'
+import { getPlaceDetail, type PlaceDetail } from '../api/placeRecommendations'
 
 const COMMENT_PAGE_SIZE = 20
+const CONTENT_MAX_LENGTH = 1000
 
 const formatTimeAgo = (value: string) => {
   const timestamp = Date.parse(value)
@@ -47,10 +50,14 @@ export default function PostDetailPage() {
   const { user } = useAuth()
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null)
   const commentSentinelRef = useRef<HTMLDivElement | null>(null)
+  const detailRef = useRef<PostDetail | null>(null)
 
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null)
+  const [placeLoading, setPlaceLoading] = useState(false)
+  const [placeError, setPlaceError] = useState('')
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [likeCount, setLikeCount] = useState(0)
   const [liked, setLiked] = useState(false)
@@ -59,11 +66,12 @@ export default function PostDetailPage() {
   const [commentToDelete, setCommentToDelete] = useState<CommentItem | null>(null)
   const [comments, setComments] = useState<CommentItem[]>([])
   const [commentPage, setCommentPage] = useState(0)
-  const [hasMoreComments, setHasMoreComments] = useState(false)
+  const [hasMoreComments, setHasMoreComments] = useState(true)
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+  const [pendingHighlightId, setPendingHighlightId] = useState<number | null>(null)
 
   const showToast = (message: string) => {
     setToastInfo({ message, key: Date.now() })
@@ -76,65 +84,142 @@ export default function PostDetailPage() {
   }, [])
 
   useEffect(() => {
-    if (!id) {
-      setError('잘못된 게시글입니다.')
-      setIsLoading(false)
+    if (!detail || detail.boardType !== 'PLACE_RECOMMEND' || !detail.googlePlaceId) {
+      setPlaceDetail(null)
+      setPlaceError('')
+      setPlaceLoading(false)
       return
     }
+
     let cancelled = false
 
-    const fetchDetail = async () => {
-      setIsLoading(true)
-      setError('')
+    const googlePlaceId = detail.googlePlaceId as string
+    const loadPlace = async () => {
+      setPlaceLoading(true)
+      setPlaceError('')
       try {
-        const response = await getPost(id)
-        if (cancelled) {
-          return
-        }
-        setDetail(response)
-        setLikeCount(response.likeCount)
-        setLiked(response.likedByRequester)
-        const safeComments = Array.isArray(response.comments) ? response.comments : []
-        setComments(safeComments)
-        setCommentPage(1)
-        setHasMoreComments((response.commentCount ?? 0) > safeComments.length)
-      } catch {
+        const place = await getPlaceDetail(googlePlaceId)
         if (!cancelled) {
-          setError('게시글을 불러오지 못했습니다.')
+          setPlaceDetail(place)
+        }
+      } catch (err) {
+        console.error('fetch place detail failed', err)
+        if (!cancelled) {
+          setPlaceError('장소 정보를 불러올 수 없습니다.')
+          setPlaceDetail(null)
         }
       } finally {
         if (!cancelled) {
-          setIsLoading(false)
+          setPlaceLoading(false)
         }
       }
     }
 
-    fetchDetail()
+    loadPlace()
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [detail])
 
-  const loadMoreComments = useCallback(async () => {
-    if (commentsLoading || !detail) {
+  const fetchCommentPage = useCallback(
+    async (pageNumber: number, replace = false, overridePostId?: number) => {
+      const postId = overridePostId ?? detailRef.current?.postId
+      if (!postId) {
+        return
+      }
+      setCommentsLoading(true)
+      try {
+        const response = await getPostComments(postId, {
+          page: pageNumber,
+          size: COMMENT_PAGE_SIZE,
+        })
+        const isArrayResponse = Array.isArray(response)
+        const incomingComments = isArrayResponse
+          ? response
+          : Array.isArray(response.comments)
+            ? response.comments
+            : Array.isArray(response.content)
+              ? response.content
+              : []
+        const normalizedComments = incomingComments.map((item) => ({
+          ...item,
+          deletable:
+            typeof item.deletable === 'boolean'
+              ? item.deletable
+              : Boolean(user && item.authorId === user.id),
+        }))
+        setComments((prev) => (replace ? normalizedComments : [...prev, ...normalizedComments]))
+        const hasMore = isArrayResponse
+          ? incomingComments.length === COMMENT_PAGE_SIZE
+          : response.hasMore ??
+            (typeof response.last === 'boolean'
+              ? !response.last
+              : incomingComments.length === COMMENT_PAGE_SIZE)
+        setHasMoreComments(Boolean(hasMore))
+        setCommentPage(pageNumber + 1)
+      } catch {
+        showToast('댓글을 불러오는 중 오류가 발생했습니다.')
+      } finally {
+        setCommentsLoading(false)
+      }
+    },
+    [user],
+  )
+
+  const loadPostDetail = useCallback(
+    async (options?: { signal?: { aborted: boolean }; suppressLoading?: boolean }) => {
+      if (!id) {
+        setDetail(null)
+        detailRef.current = null
+        setError('잘못된 게시글입니다.')
+        setIsLoading(false)
+        return
+      }
+      if (!options?.suppressLoading) {
+        setIsLoading(true)
+      }
+      setError('')
+      try {
+        const response = await getPost(id)
+        if (options?.signal?.aborted) {
+          return
+        }
+        setDetail(response)
+        detailRef.current = response
+        setLikeCount(response.likeCount)
+        setLiked(response.likedByRequester)
+        setComments([])
+        setHasMoreComments(true)
+        setCommentPage(0)
+        await fetchCommentPage(0, true, response.postId)
+      } catch {
+        detailRef.current = null
+        if (!options?.signal?.aborted) {
+          setError('게시글을 불러오지 못했습니다.')
+        }
+      } finally {
+        if (!options?.signal?.aborted && !options?.suppressLoading) {
+          setIsLoading(false)
+        }
+      }
+    },
+    [fetchCommentPage, id],
+  )
+
+  useEffect(() => {
+    const controller = { aborted: false }
+    loadPostDetail({ signal: controller })
+    return () => {
+      controller.aborted = true
+    }
+  }, [loadPostDetail])
+
+  const loadMoreComments = useCallback(() => {
+    if (commentsLoading || !hasMoreComments) {
       return
     }
-    setCommentsLoading(true)
-    try {
-      const response = await getPostComments(detail.postId, {
-        page: commentPage,
-        size: COMMENT_PAGE_SIZE,
-      })
-      const incomingComments = Array.isArray(response.comments) ? response.comments : []
-      setComments((prev) => [...prev, ...incomingComments])
-      setHasMoreComments(response.hasMore)
-      setCommentPage((prev) => prev + 1)
-    } catch {
-      showToast('댓글을 불러오는 중 오류가 발생했습니다.')
-    } finally {
-      setCommentsLoading(false)
-    }
-  }, [commentPage, commentsLoading, detail])
+    fetchCommentPage(commentPage)
+  }, [commentsLoading, commentPage, fetchCommentPage, hasMoreComments])
 
   useEffect(() => {
     if (!hasMoreComments || commentsLoading) {
@@ -208,11 +293,16 @@ export default function PostDetailPage() {
       showToast('게시글 정보를 확인할 수 없습니다.')
       return
     }
-    console.log('submit comment', detail.postId, trimmed)
     setCommentSubmitting(true)
     try {
-      await createComment(detail.postId, { content: trimmed })
-      window.location.reload()
+      const created = await createComment(detail.postId, { content: trimmed })
+      setNewComment('')
+      const textarea = commentInputRef.current
+      if (textarea) {
+        textarea.style.height = 'auto'
+      }
+      await loadPostDetail({ suppressLoading: true })
+      setPendingHighlightId(created.commentId)
     } catch {
       showToast('댓글 등록에 실패했습니다.')
     } finally {
@@ -234,7 +324,7 @@ export default function PostDetailPage() {
     setPostDeleteModal(false)
     try {
       await deletePost(detail.postId)
-      navigate('/posts')
+      navigate('/posts?boardType=PLAN_SHARE')
     } catch {
       showToast('게시글 삭제에 실패했습니다.')
     }
@@ -248,32 +338,82 @@ export default function PostDetailPage() {
     setCommentToDelete(null)
     try {
       await deleteComment(detail.postId, target.commentId)
-      setComments((prev) => prev.filter((item) => item.commentId !== target.commentId))
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              commentCount: Math.max((prev.commentCount ?? 0) - 1, 0),
-            }
-          : prev,
-      )
+      await loadPostDetail({ suppressLoading: true })
     } catch {
       showToast('댓글 삭제에 실패했습니다.')
     }
+  }
+
+  const handlePlanCardClick = () => {
+  if (!detail?.tripId) {
+      return
+    }
+    navigate(`/trips/${detail.tripId}/itineraries?readonly=true`)
   }
 
   const handleCloseLightbox = () => {
     setLightboxImage(null)
   }
 
-  const displayedCommentCount = comments.length
+  useEffect(() => {
+    if (!lightboxImage) {
+      document.body.style.overflow = ''
+      return undefined
+    }
+
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleCloseLightbox()
+      }
+    }
+    const listener: EventListener = (event) => handleKeyDown(event as unknown as KeyboardEvent)
+
+    window.addEventListener('keydown', listener)
+    return () => {
+      document.body.style.overflow = originalOverflow
+      window.removeEventListener('keydown', listener)
+    }
+  }, [lightboxImage])
+
+  useEffect(() => {
+    if (pendingHighlightId === null) {
+      return
+    }
+    const target = document.getElementById(`comment-${pendingHighlightId}`)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setPendingHighlightId(null)
+    }
+  }, [pendingHighlightId, comments])
+
+  useEffect(() => {
+    detailRef.current = detail
+  }, [detail])
+
+  const totalCommentCount = detail?.commentCount ?? 0
   const isAuthor = detail?.author.authorId === user?.id
 
   return (
     <main className="post-detail-shell">
-      <button className="post-detail-back" type="button" onClick={() => navigate('/posts')}>
-        ← 게시물 목록
-      </button>
+      <div className="post-detail-shell__header">
+        <button
+          className="post-detail-back"
+          type="button"
+          onClick={() => navigate('/posts')}
+          aria-label="뒤로가기"
+        >
+          ← 뒤로가기
+        </button>
+        {detail && (
+          <div className="post-detail-shell__board">
+            <p className="post-detail-board__name">{detail.boardName}</p>
+            <p className="post-detail-board__description">{detail.boardDescription}</p>
+          </div>
+        )}
+      </div>
       {toastInfo && (
         <Toast key={toastInfo.key} message={toastInfo.message} onClose={() => setToastInfo(null)} />
       )}
@@ -281,14 +421,14 @@ export default function PostDetailPage() {
       {!isLoading && error && <p className="post-status post-status--error">{error}</p>}
       {!isLoading && !error && detail && (
         <>
+          <div className="post-detail-board">
+            <p className="post-detail-board__name">{detail.boardName}</p>
+            <p className="post-detail-board__description">{detail.boardDescription}</p>
+          </div>
           <section className="post-detail-card">
             <header className="post-detail-header">
-              <p className="post-detail-board">
-                <span className="post-detail-board__name">{detail.boardName}</span>
-                <span className="post-detail-board__description">{detail.boardDescription}</span>
-              </p>
               <div className="post-detail-title-row">
-                <h1>{detail.title}</h1>
+                <h1 style={{ whiteSpace: 'pre-wrap' }}>{detail.title}</h1>
                 <span className="post-detail-title-time" aria-label="작성 시간">
                   {formatTimeAgo(detail.createdAt)}
                 </span>
@@ -298,6 +438,11 @@ export default function PostDetailPage() {
                   <img
                     src={resolveImageUrl(detail.author.profileImageUrl, DEFAULT_AVATAR_URL)}
                     alt={`${detail.author.nickname} 프로필`}
+                    onError={(event) => {
+                      const target = event.currentTarget
+                      target.onerror = null
+                      target.src = DEFAULT_AVATAR_URL
+                    }}
                   />
                   <div>
                     <strong>{detail.author.nickname}</strong>
@@ -310,10 +455,13 @@ export default function PostDetailPage() {
                     className={`action-like${liked ? ' liked' : ''}`}
                     onClick={handleToggleLike}
                     disabled={likeProcessing}
+                    aria-pressed={liked}
                   >
-                    👍 {likeCount}
+                    좋아요 {likeCount}
                   </button>
-                  <span>💬 {displayedCommentCount}</span>
+                  <span className="post-detail-stats__separator" aria-live="polite">
+                    댓글 {totalCommentCount}
+                  </span>
                 </div>
               </div>
               {isAuthor && (
@@ -335,6 +483,85 @@ export default function PostDetailPage() {
                 </div>
               )}
             </header>
+            {detail.tripId && (
+              <button
+                type="button"
+                className="plan-share-card"
+                onClick={handlePlanCardClick}
+                aria-label="공유된 일정 결과로 이동"
+              >
+                <div className="plan-share-card__image">
+                  <img
+                    src={
+                      detail.planThumbnailUrl
+                        ? resolveImageUrl(detail.planThumbnailUrl, DEFAULT_PLAN_THUMBNAIL_URL)
+                        : DEFAULT_PLAN_THUMBNAIL_URL
+                    }
+                    alt={detail.tripTitle ? `${detail.tripTitle} 썸네일` : '공유된 일정 이미지'}
+                    onError={(event) => {
+                      const target = event.currentTarget
+                      if (target.dataset.fallback === 'applied') return
+                      target.dataset.fallback = 'applied'
+                      target.src = DEFAULT_PLAN_THUMBNAIL_URL
+                    }}
+                  />
+                </div>
+                <div className="plan-share-card__body">
+                  <p className="plan-share-card__label">공유된 일정</p>
+                  <h2>{detail.tripTitle || '공유된 일정'}</h2>
+                  <p className="plan-share-card__hint">일정 재생성과 채팅은 비활성화</p>
+                </div>
+                <div className="plan-share-card__cta">일정 결과 보기</div>
+              </button>
+            )}
+            {detail.boardType === 'PLACE_RECOMMEND' && (
+              <section className="place-recommend-card">
+                {placeLoading && (
+                  <p className="place-recommend-card__message">장소 정보를 불러오는 중...</p>
+                )}
+                {placeError && (
+                  <p className="place-recommend-card__message place-recommend-card__message--error">
+                    {placeError}
+                  </p>
+                )}
+                {placeDetail && (
+                  <button
+                    type="button"
+                    className="place-recommend-card__body"
+                    onClick={() => window.open(placeDetail.googleMapsUrl, '_blank')}
+                  >
+                    <div className="place-recommend-card__image">
+                      <img
+                        src={
+                          placeDetail.photoUrl
+                            ? resolveImageUrl(placeDetail.photoUrl, DEFAULT_PLAN_THUMBNAIL_URL)
+                            : DEFAULT_PLAN_THUMBNAIL_URL
+                        }
+                        alt={`${placeDetail.name} 대표 이미지`}
+                        onError={(event) => {
+                          const target = event.currentTarget
+                          if (target.dataset.fallback === 'applied') {
+                            return
+                          }
+                          target.dataset.fallback = 'applied'
+                          target.src = DEFAULT_PLAN_THUMBNAIL_URL
+                        }}
+                      />
+                    </div>
+                    <div className="place-recommend-card__info">
+                      <strong>{placeDetail.name}</strong>
+                      <span>{`${placeDetail.city} · ${placeDetail.country}`}</span>
+                    </div>
+                    <div className="place-recommend-card__meta">
+                      <span className="place-recommend-card__rating">
+                        ★ {detail.userRating ?? detail.rating ?? 0}
+                      </span>
+                      <span>{formatTimeAgo(detail.createdAt)}</span>
+                    </div>
+                  </button>
+                )}
+              </section>
+            )}
             {detail.images && detail.images.filter((img) => img.url).length > 0 && (
               <div className="post-detail-images">
                 {detail.images
@@ -349,15 +576,22 @@ export default function PostDetailPage() {
                   })}
               </div>
             )}
-            <article className="post-detail-content">{detail.content}</article>
+            <article className="post-detail-content">
+              {detail.content.slice(0, CONTENT_MAX_LENGTH)}
+              {detail.content.length > CONTENT_MAX_LENGTH && (
+                <p className="post-detail-content__limit">최대 1,000자까지 표시됩니다.</p>
+              )}
+            </article>
           </section>
           <section className="comment-input-shell">
             <header>
               <strong>댓글 작성</strong>
-              <span>{newComment.length}/500</span>
+              <span>{newComment.length}/500자</span>
             </header>
             <textarea
               ref={commentInputRef}
+              id="comment-content"
+              name="content"
               className="comment-textarea"
               placeholder="댓글을 입력하세요..."
               value={newComment}
@@ -378,26 +612,30 @@ export default function PostDetailPage() {
           </section>
           <section className="post-detail-comments">
             <header>
-              <strong>댓글 ({displayedCommentCount})</strong>
-              <p>최대 20개씩, 오래된 순</p>
+              <div>
+                <strong>댓글 ({totalCommentCount})</strong>
+                <p>최대 20개, 작성 시간 기준 오래된 순</p>
+              </div>
             </header>
             <div className="comment-list">
               {comments.length === 0 && <p className="post-status">댓글이 없습니다.</p>}
               {comments.map((comment) => (
-                <article key={comment.commentId} className="comment-card">
-                  <div className="comment-author">
-                    <img
-                      src={resolveImageUrl(comment.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
-                      alt={`${comment.authorNickname} 프로필`}
-                    />
-                    <div>
-                      <strong>{comment.authorNickname}</strong>
-                      <span>{formatTimeAgo(comment.createdAt)}</span>
+                <article key={comment.commentId} className="comment-card" id={`comment-${comment.commentId}`}>
+                  <div className="comment-card__head">
+                    <div className="comment-author">
+                      <img
+                        src={resolveImageUrl(comment.authorProfileImageUrl, DEFAULT_AVATAR_URL)}
+                        alt={`${comment.authorNickname} 프로필`}
+                      />
+                      <div>
+                        <strong>{comment.authorNickname}</strong>
+                        <span>{formatTimeAgo(comment.createdAt)}</span>
+                      </div>
                     </div>
                     {comment.deletable && (
                       <button
                         type="button"
-                        className="text-link danger"
+                        className="text-link danger comment-delete"
                         onClick={() => setCommentToDelete(comment)}
                       >
                         삭제
