@@ -68,6 +68,9 @@ export interface PostDetail {
   tripId?: number | null
   tripTitle?: string | null
   planThumbnailUrl?: string | null
+  placeImageUrl?: string | null
+  city?: string | null
+  country?: string | null
 }
 
 export interface CommentItem {
@@ -99,6 +102,7 @@ export interface CreatePostPayload {
   planId?: number
   placeName?: string
   rating?: number
+  userRating?: number
   googlePlaceId?: string
 }
 
@@ -110,6 +114,7 @@ export interface UpdatePostPayload {
   planId?: number
   placeName?: string
   rating?: number
+  userRating?: number
   googlePlaceId?: string
 }
 
