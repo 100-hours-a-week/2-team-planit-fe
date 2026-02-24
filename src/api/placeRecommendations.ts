@@ -6,6 +6,7 @@ export interface PlaceSearchResult {
   name: string
   addressText: string
   description?: string
+  city?: string
 }
 
 const BASE_PATH = '/place-recommendations'

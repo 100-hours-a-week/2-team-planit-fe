@@ -495,6 +495,7 @@ export default function PostEditPage() {
         onSelect={(place) => {
           handleSelectPlace({
             name: place.name,
+            addressText: place.addressText,
             city: place.addressText,
             googlePlaceId: place.googlePlaceId ?? place.placeId,
           })

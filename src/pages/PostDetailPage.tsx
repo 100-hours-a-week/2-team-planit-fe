@@ -54,10 +54,6 @@ export default function PostDetailPage() {
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-<<<<<<< Updated upstream
-=======
-  const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null)
->>>>>>> Stashed changes
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [likeCount, setLikeCount] = useState(0)
   const [liked, setLiked] = useState(false)
@@ -83,36 +79,6 @@ export default function PostDetailPage() {
     }
   }, [])
 
-<<<<<<< Updated upstream
-=======
-  useEffect(() => {
-    if (!detail || detail.boardName !== '장소 추천' || !detail.googlePlaceId) {
-      setPlaceDetail(null)
-      return
-    }
-
-    let cancelled = false
-    const loadPlace = async () => {
-      try {
-        const place = await getPlaceDetail(detail.googlePlaceId!)
-        if (!cancelled) {
-          setPlaceDetail(place)
-        }
-      } catch (err) {
-        console.error('fetch place detail failed', err)
-        if (!cancelled) {
-          setPlaceDetail(null)
-        }
-      }
-    }
-
-    loadPlace()
-    return () => {
-      cancelled = true
-    }
-  }, [detail])
-
->>>>>>> Stashed changes
   const fetchCommentPage = useCallback(
     async (pageNumber: number, replace = false, overridePostId?: number) => {
       const postId = overridePostId ?? detailRef.current?.postId
@@ -506,7 +472,6 @@ export default function PostDetailPage() {
                 <div className="plan-share-card__cta">일정 결과 보기</div>
               </button>
             )}
-<<<<<<< Updated upstream
             {detail.boardName === '장소 추천' ? (
               <>
                 <header className="place-detail-header">
@@ -519,46 +484,6 @@ export default function PostDetailPage() {
                 <article className="place-detail-card place-detail-card--flat">
                   <div
                     className="place-detail-image"
-=======
-            {detail.boardName === '장소 추천' && (
-              <section className="place-detail-hero">
-                <div
-                  className="place-detail-image"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    detail.googlePlaceId &&
-                    window.open(`https://www.google.com/maps/place/?q=place_id:${detail.googlePlaceId}`, '_blank')
-                  }
-                  onKeyDown={(event) => {
-                    if (detail.googlePlaceId && (event.key === 'Enter' || event.key === ' ')) {
-                      window.open(`https://www.google.com/maps/place/?q=place_id:${detail.googlePlaceId}`, '_blank')
-                    }
-                  }}
-                >
-                  <img
-                    src={
-                      placeDetail?.photoUrl
-                        ? resolveImageUrl(placeDetail.photoUrl, DEFAULT_PLAN_THUMBNAIL_URL)
-                        : detail.placeImageUrl
-                          ? resolveImageUrl(detail.placeImageUrl, DEFAULT_PLAN_THUMBNAIL_URL)
-                          : DEFAULT_PLAN_THUMBNAIL_URL
-                    }
-                    alt={placeDetail?.name || detail.placeName || '장소 대표 이미지'}
-                    onError={(event) => {
-                      const target = event.currentTarget
-                      if (target.dataset.fallback === 'applied') {
-                        return
-                      }
-                      target.dataset.fallback = 'applied'
-                      target.src = DEFAULT_PLAN_THUMBNAIL_URL
-                    }}
-                  />
-                </div>
-                <div className="place-detail-card__body">
-                  <strong
-                    className="place-detail-card__title"
->>>>>>> Stashed changes
                     role="button"
                     tabIndex={0}
                     onClick={() =>
@@ -571,7 +496,6 @@ export default function PostDetailPage() {
                       }
                     }}
                   >
-<<<<<<< Updated upstream
                     <img
                       src={
                         detail.placeImageUrl
@@ -659,38 +583,6 @@ export default function PostDetailPage() {
                   )}
                 </article>
               </>
-=======
-                    {placeDetail?.name ?? detail.placeName ?? '장소 정보'}
-                  </strong>
-                  <span className="place-detail-card__region">
-                    {placeDetail
-                      ? `${placeDetail.city} · ${placeDetail.country}`
-                      : detail.city || detail.country
-                        ? `${detail.city ?? '지역 정보 없음'} · ${detail.country ?? '지역 정보 없음'}`
-                        : '지역 정보 없음'}
-                  </span>
-                  <div className="place-detail-meta">
-                    <div className="place-detail-stars" aria-label={`평점 ${detail.userRating ?? detail.rating ?? 0}점`}>
-                      {Array.from({ length: 5 }, (_, index) => {
-                        const ratingValue = detail.userRating ?? detail.rating ?? 0
-                        return (
-                          <span
-                            key={index}
-                            className={`place-detail-star${index < ratingValue ? ' place-detail-star--active' : ''}`}
-                          />
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <article className="post-detail-content">
-                    {detail.content.slice(0, CONTENT_MAX_LENGTH)}
-                    {detail.content.length > CONTENT_MAX_LENGTH && (
-                      <p className="post-detail-content__limit">최대 1,000자까지 표시됩니다.</p>
-                    )}
-                  </article>
-                </div>
-              </section>
->>>>>>> Stashed changes
             )}
           </section>
           <section className="comment-input-shell">
