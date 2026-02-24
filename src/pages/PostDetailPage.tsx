@@ -22,7 +22,6 @@ import {
 } from '../api/posts'
 import type { CommentItem, PostDetail } from '../api/posts'
 import { useAuth } from '../store'
-import { getPlaceDetail, type PlaceDetail } from '../api/placeRecommendations'
 
 const COMMENT_PAGE_SIZE = 20
 const CONTENT_MAX_LENGTH = 1000
@@ -55,9 +54,6 @@ export default function PostDetailPage() {
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null)
-  const [placeLoading, setPlaceLoading] = useState(false)
-  const [placeError, setPlaceError] = useState('')
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [likeCount, setLikeCount] = useState(0)
   const [liked, setLiked] = useState(false)
@@ -82,44 +78,6 @@ export default function PostDetailPage() {
       setToastInfo(null)
     }
   }, [])
-
-  useEffect(() => {
-    if (!detail || detail.boardType !== 'PLACE_RECOMMEND' || !detail.googlePlaceId) {
-      setPlaceDetail(null)
-      setPlaceError('')
-      setPlaceLoading(false)
-      return
-    }
-
-    let cancelled = false
-
-    const googlePlaceId = detail.googlePlaceId as string
-    const loadPlace = async () => {
-      setPlaceLoading(true)
-      setPlaceError('')
-      try {
-        const place = await getPlaceDetail(googlePlaceId)
-        if (!cancelled) {
-          setPlaceDetail(place)
-        }
-      } catch (err) {
-        console.error('fetch place detail failed', err)
-        if (!cancelled) {
-          setPlaceError('장소 정보를 불러올 수 없습니다.')
-          setPlaceDetail(null)
-        }
-      } finally {
-        if (!cancelled) {
-          setPlaceLoading(false)
-        }
-      }
-    }
-
-    loadPlace()
-    return () => {
-      cancelled = true
-    }
-  }, [detail])
 
   const fetchCommentPage = useCallback(
     async (pageNumber: number, replace = false, overridePostId?: number) => {
@@ -514,74 +472,118 @@ export default function PostDetailPage() {
                 <div className="plan-share-card__cta">일정 결과 보기</div>
               </button>
             )}
-            {detail.boardType === 'PLACE_RECOMMEND' && (
-              <section className="place-recommend-card">
-                {placeLoading && (
-                  <p className="place-recommend-card__message">장소 정보를 불러오는 중...</p>
-                )}
-                {placeError && (
-                  <p className="place-recommend-card__message place-recommend-card__message--error">
-                    {placeError}
-                  </p>
-                )}
-                {placeDetail && (
-                  <button
-                    type="button"
-                    className="place-recommend-card__body"
-                    onClick={() => window.open(placeDetail.googleMapsUrl, '_blank')}
+            {detail.boardName === '장소 추천' ? (
+              <>
+                <header className="place-detail-header">
+                  <div>
+                    <p className="place-detail-header__label">장소 추천</p>
+                    <p className="place-detail-header__desc">구글 맵스 기반 장소 정보를 확인하세요.</p>
+                  </div>
+                  <span className="place-detail-timestamp">{formatTimeAgo(detail.createdAt)}</span>
+                </header>
+                <article className="place-detail-card place-detail-card--flat">
+                  <div
+                    className="place-detail-image"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      detail.googlePlaceId &&
+                      window.open(`https://www.google.com/maps/place/?q=place_id:${detail.googlePlaceId}`, '_blank')
+                    }
+                    onKeyDown={(event) => {
+                      if (detail.googlePlaceId && (event.key === 'Enter' || event.key === ' ')) {
+                        window.open(`https://www.google.com/maps/place/?q=place_id:${detail.googlePlaceId}`, '_blank')
+                      }
+                    }}
                   >
-                    <div className="place-recommend-card__image">
-                      <img
-                        src={
-                          placeDetail.photoUrl
-                            ? resolveImageUrl(placeDetail.photoUrl, DEFAULT_PLAN_THUMBNAIL_URL)
-                            : DEFAULT_PLAN_THUMBNAIL_URL
+                    <img
+                      src={
+                        detail.placeImageUrl
+                          ? resolveImageUrl(detail.placeImageUrl, DEFAULT_PLAN_THUMBNAIL_URL)
+                          : DEFAULT_PLAN_THUMBNAIL_URL
+                      }
+                      alt={detail.placeName ? `${detail.placeName} 대표 이미지` : '장소 대표 이미지'}
+                      onError={(event) => {
+                        const target = event.currentTarget
+                        if (target.dataset.fallback === 'applied') {
+                          return
                         }
-                        alt={`${placeDetail.name} 대표 이미지`}
-                        onError={(event) => {
-                          const target = event.currentTarget
-                          if (target.dataset.fallback === 'applied') {
-                            return
-                          }
-                          target.dataset.fallback = 'applied'
-                          target.src = DEFAULT_PLAN_THUMBNAIL_URL
-                        }}
-                      />
+                        target.dataset.fallback = 'applied'
+                        target.src = DEFAULT_PLAN_THUMBNAIL_URL
+                      }}
+                    />
+                  </div>
+                  <div className="place-detail-card__body">
+                    <strong
+                      className="place-detail-card__title"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() =>
+                        detail.googlePlaceId &&
+                        window.open(`https://www.google.com/maps/place/?q=place_id:${detail.googlePlaceId}`, '_blank')
+                      }
+                      onKeyDown={(event) => {
+                        if (detail.googlePlaceId && (event.key === 'Enter' || event.key === ' ')) {
+                          window.open(`https://www.google.com/maps/place/?q=place_id:${detail.googlePlaceId}`, '_blank')
+                        }
+                      }}
+                    >
+                      {detail.placeName ?? '장소 정보'}
+                    </strong>
+                    <span className="place-detail-card__region">
+                      {detail.city || detail.country
+                        ? `${detail.city ?? '지역 정보 없음'} · ${detail.country ?? '지역 정보 없음'}`
+                        : '지역 정보 없음'}
+                    </span>
+                    <div className="place-detail-meta">
+                      <div
+                        className="place-detail-stars"
+                        aria-label={`평점 ${detail.userRating ?? detail.rating ?? 0}점`}
+                      >
+                        {Array.from({ length: 5 }, (_, index) => {
+                          const ratingValue = detail.userRating ?? detail.rating ?? 0
+                          return (
+                            <span
+                              key={index}
+                              className={`place-detail-star${index < ratingValue ? ' place-detail-star--active' : ''}`}
+                            />
+                          )
+                        })}
+                      </div>
                     </div>
-                    <div className="place-recommend-card__info">
-                      <strong>{placeDetail.name}</strong>
-                      <span>{`${placeDetail.city} · ${placeDetail.country}`}</span>
-                    </div>
-                    <div className="place-recommend-card__meta">
-                      <span className="place-recommend-card__rating">
-                        ★ {detail.userRating ?? detail.rating ?? 0}
-                      </span>
-                      <span>{formatTimeAgo(detail.createdAt)}</span>
-                    </div>
-                  </button>
+                    <article className="post-detail-content">
+                      {detail.content.slice(0, CONTENT_MAX_LENGTH)}
+                      {detail.content.length > CONTENT_MAX_LENGTH && (
+                        <p className="post-detail-content__limit">최대 1,000자까지 표시됩니다.</p>
+                      )}
+                    </article>
+                  </div>
+                </article>
+              </>
+            ) : (
+              <>
+                {detail.images && detail.images.filter((img) => img.url).length > 0 && (
+                  <div className="post-detail-images">
+                    {detail.images
+                      .filter((img) => img.url)
+                      .map((image) => {
+                        const imageSrc = resolveImageUrl(image.url, DEFAULT_AVATAR_URL)
+                        return (
+                          <figure key={image.imageId} onClick={() => setLightboxImage(imageSrc)}>
+                            <img src={imageSrc} alt={`이미지 ${image.imageId}`} />
+                          </figure>
+                        )
+                      })}
+                  </div>
                 )}
-              </section>
+                <article className="post-detail-content">
+                  {detail.content.slice(0, CONTENT_MAX_LENGTH)}
+                  {detail.content.length > CONTENT_MAX_LENGTH && (
+                    <p className="post-detail-content__limit">최대 1,000자까지 표시됩니다.</p>
+                  )}
+                </article>
+              </>
             )}
-            {detail.images && detail.images.filter((img) => img.url).length > 0 && (
-              <div className="post-detail-images">
-                {detail.images
-                  .filter((img) => img.url)
-                  .map((image) => {
-                    const imageSrc = resolveImageUrl(image.url, DEFAULT_AVATAR_URL)
-                    return (
-                      <figure key={image.imageId} onClick={() => setLightboxImage(imageSrc)}>
-                        <img src={imageSrc} alt={`이미지 ${image.imageId}`} />
-                      </figure>
-                    )
-                  })}
-              </div>
-            )}
-            <article className="post-detail-content">
-              {detail.content.slice(0, CONTENT_MAX_LENGTH)}
-              {detail.content.length > CONTENT_MAX_LENGTH && (
-                <p className="post-detail-content__limit">최대 1,000자까지 표시됩니다.</p>
-              )}
-            </article>
           </section>
           <section className="comment-input-shell">
             <header>

@@ -2,23 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Toast from '../components/Toast'
+import PlaceSearchModal from '../components/PlaceSearchModal'
 import { deletePostImageByKey, getPost, getPostPresignedUrl, updatePost } from '../api/posts'
 import type { PostDetail } from '../api/posts'
+import type { PlaceSearchResult } from '../api/placeRecommendations'
 import { useAuth } from '../store'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import { resolveImageUrl } from '../utils/image'
 import { fetchTrips } from '../api/trips'
 import type { TripListItem } from '../api/trips'
-
-const PLACE_SUGGESTIONS = [
-  { name: '괌', city: '미국 · 괌' },
-  { name: '가오슝', city: '대만 · 가오슝' },
-  { name: '도쿄', city: '일본 · 도쿄' },
-  { name: '오사카', city: '일본 · 오사카' },
-  { name: '다낭', city: '베트남 · 다낭' },
-  { name: '나트랑', city: '베트남 · 나트랑' },
-  { name: '파리', city: '프랑스 · 파리' },
-]
 
 const BOARD_OPTIONS = [
   { value: 'FREE', label: '자유게시판', description: '여행 경험과 사진을 자유롭게 공유해보세요.' },
@@ -53,9 +45,9 @@ export default function PostEditPage() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; content?: string; schedule?: string; location?: string; rating?: string }>({})
-  const [locationQuery, setLocationQuery] = useState('')
-  const [selectedLocation, setSelectedLocation] = useState<{ name: string; city: string; googlePlaceId?: string } | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<PlaceSearchResult | null>(null)
   const [rating, setRating] = useState(0)
+  const [placeModalOpen, setPlaceModalOpen] = useState(false)
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [removedKeys, setRemovedKeys] = useState<string[]>([])
 
@@ -174,9 +166,17 @@ export default function PostEditPage() {
           : 'FREE')
     setBoardType(mappedType)
     if (mappedType === 'PLACE_RECOMMEND') {
-      setSelectedLocation(detail.placeName ? { name: detail.placeName, city: detail.placeName, googlePlaceId: '' } : null)
-      setRating(0)
-      setLocationQuery(detail.placeName ?? '')
+      setSelectedLocation(
+        detail.placeName
+          ? {
+              name: detail.placeName,
+              addressText: detail.placeName,
+              city: detail.placeName,
+              googlePlaceId: detail.googlePlaceId ?? '',
+            }
+          : null,
+      )
+      setRating(detail.userRating ?? detail.rating ?? 0)
     }
   }, [detail, detail?.boardType, detail?.boardName, detail?.placeName])
 
@@ -187,7 +187,6 @@ export default function PostEditPage() {
     }
     if (boardType !== 'PLACE_RECOMMEND') {
       setSelectedLocation(null)
-      setLocationQuery('')
       setRating(0)
     }
   }, [boardType])
@@ -219,6 +218,9 @@ export default function PostEditPage() {
       }
       if (!rating) {
         nextErrors.rating = '*별점을 선택해주세요.'
+      }
+      if (selectedLocation && !selectedLocation.googlePlaceId) {
+        nextErrors.location = '*유효한 장소를 선택해주세요.'
       }
     }
     setErrors(nextErrors)
@@ -289,17 +291,11 @@ export default function PostEditPage() {
     trackRemovedKey(keyToDelete)
   }
 
-  const filteredPlaces = useMemo(() => {
-    const query = locationQuery.trim().toLowerCase()
-    if (!query) {
-      return PLACE_SUGGESTIONS
+  const handleSelectPlace = (place: PlaceSearchResult) => {
+    setSelectedLocation(place)
+    if (place.name) {
+      setTitle(place.name)
     }
-    return PLACE_SUGGESTIONS.filter((place) => place.name.toLowerCase().includes(query) || place.city.toLowerCase().includes(query))
-  }, [locationQuery])
-
-  const handleSelectPlace = (place: (typeof PLACE_SUGGESTIONS)[number]) => {
-    setSelectedLocation({ name: place.name, city: place.city, googlePlaceId: '' })
-    setLocationQuery(place.name)
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -325,7 +321,7 @@ export default function PostEditPage() {
       }
       if (boardType === 'PLACE_RECOMMEND' && selectedLocation) {
         payload.placeName = selectedLocation.name
-        payload.rating = rating
+        payload.userRating = rating
         if (selectedLocation.googlePlaceId) {
           payload.googlePlaceId = selectedLocation.googlePlaceId
         }
@@ -452,18 +448,11 @@ export default function PostEditPage() {
               <label>위치 검색</label>
               <input
                 type="text"
-                value={locationQuery}
-                onChange={(event) => setLocationQuery(event.target.value)}
+                value={selectedLocation?.name ?? ''}
+                readOnly
                 placeholder="위치를 검색하세요"
+                onClick={() => setPlaceModalOpen(true)}
               />
-              <div className="location-suggestions">
-                {filteredPlaces.map((place) => (
-                  <button key={place.name} type="button" onClick={() => handleSelectPlace(place)}>
-                    <span className="location-name">{place.name}</span>
-                    <span className="location-city">{place.city}</span>
-                  </button>
-                ))}
-              </div>
               {selectedLocation && <p className="selected-location">선택 장소: {selectedLocation.name}</p>}
               {errors.location && <p className="form-error">{errors.location}</p>}
               <div className="rating">
@@ -481,10 +470,10 @@ export default function PostEditPage() {
               {errors.rating && <p className="form-error">{errors.rating}</p>}
             </div>
           )}
-          <div className="form-actions">
-            <button type="button" className="secondary-btn" onClick={() => navigate(`/posts/${detail.postId}`)}>
-              취소
-            </button>
+        <div className="form-actions">
+          <button type="button" className="secondary-btn" onClick={() => navigate(`/posts/${detail.postId}`)}>
+            취소
+          </button>
             <button
               type="submit"
               className="primary-btn"
@@ -497,9 +486,22 @@ export default function PostEditPage() {
             >
               {isSubmitting ? '수정 중...' : '수정하기'}
             </button>
-          </div>
-        </form>
-      )}
+         </div>
+       </form>
+     )}
+      <PlaceSearchModal
+        open={placeModalOpen}
+        onClose={() => setPlaceModalOpen(false)}
+        onSelect={(place) => {
+          handleSelectPlace({
+            name: place.name,
+            addressText: place.addressText,
+            city: place.addressText,
+            googlePlaceId: place.googlePlaceId ?? place.placeId,
+          })
+          setPlaceModalOpen(false)
+        }}
+      />
       {scheduleModalOpen && (
         <div className="schedule-picker">
           <div className="schedule-picker__overlay" onClick={() => setScheduleModalOpen(false)} />

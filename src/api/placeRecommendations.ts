@@ -1,9 +1,12 @@
 import api from './axios'
 
 export interface PlaceSearchResult {
-  googlePlaceId: string
+  googlePlaceId?: string
+  placeId?: string
   name: string
   addressText: string
+  description?: string
+  city?: string
 }
 
 const BASE_PATH = '/place-recommendations'
