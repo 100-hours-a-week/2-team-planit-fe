@@ -31,9 +31,7 @@ jobs:
       # develop 브랜치: staging API 주소 주입
       - name: Build (develop -> staging API)
         if: github.ref == 'refs/heads/develop' || github.base_ref == 'develop'
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_DEV }}
+        run: npm run build -- --mode development
 
       # main 브랜치: prod (기존 .env.production 사용)
       - name: Build (main -> production)
