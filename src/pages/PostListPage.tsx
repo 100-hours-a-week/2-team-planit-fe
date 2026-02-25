@@ -3,6 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { DEFAULT_PLAN_THUMBNAIL_URL } from '../constants/plan'
 import { resolveImageUrl } from '../utils/image.ts'
 import { getPosts } from '../api/posts'
 import type { PostListItem, SortParam } from '../api/posts'
@@ -543,15 +544,18 @@ export default function PostListPage() {
               >
                 {(() => {
                   const isPlaceRecommendBoard = boardType === '장소 추천'
-                  const imageUrl =
-                    isPlaceRecommendBoard
-                      ? post.placeImageUrl ?? post.representativeImageUrl ?? DEFAULT_AVATAR_URL
-                      : post.representativeImageUrl
+                  const isPlanShare = boardType === '일정 공유'
+                  const placeImage = isPlaceRecommendBoard
+                    ? post.placeImageUrl ?? post.representativeImageUrl
+                    : undefined
+                  const planImage = isPlanShare
+                    ? post.planThumbnailImageUrl ?? DEFAULT_PLAN_THUMBNAIL_URL
+                    : undefined
+                  const representativeImage =
+                    !isPlaceRecommendBoard && !isPlanShare ? post.representativeImageUrl : undefined
+                  const imageUrl = placeImage ?? planImage ?? representativeImage
                   const shouldShowImage = Boolean(imageUrl)
-                  const backgroundStyle =
-                    shouldShowImage && (isPlaceRecommendBoard || post.representativeImageUrl)
-                      ? { backgroundImage: `url(${imageUrl})` }
-                      : undefined
+                  const backgroundStyle = shouldShowImage ? { backgroundImage: `url(${imageUrl})` } : undefined
                   return (
                     <div
                       className={`post-card__media ${
