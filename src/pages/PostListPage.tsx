@@ -542,18 +542,22 @@ export default function PostListPage() {
                 onClick={() => navigate(`/posts/${post.postId}`)}
               >
                 {(() => {
-                  const shouldShowImage =
-                    boardType !== '일정 공유' && Boolean(post.representativeImageUrl)
+                  const isPlaceRecommendBoard = boardType === '장소 추천'
+                  const imageUrl =
+                    isPlaceRecommendBoard
+                      ? post.placeImageUrl ?? post.representativeImageUrl ?? DEFAULT_AVATAR_URL
+                      : post.representativeImageUrl
+                  const shouldShowImage = Boolean(imageUrl)
+                  const backgroundStyle =
+                    shouldShowImage && (isPlaceRecommendBoard || post.representativeImageUrl)
+                      ? { backgroundImage: `url(${imageUrl})` }
+                      : undefined
                   return (
                     <div
                       className={`post-card__media ${
                         shouldShowImage ? 'has-image' : 'no-image'
                       }`}
-                      style={
-                        shouldShowImage
-                          ? { backgroundImage: `url(${post.representativeImageUrl})` }
-                          : undefined
-                      }
+                      style={backgroundStyle}
                     >
                       {!shouldShowImage && <span className="post-card__placeholder-text">PLANIT</span>}
                     </div>
