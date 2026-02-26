@@ -17,7 +17,6 @@ type TravelSeed = {
 const BOARD_TYPES: BoardType[] = ['일정 공유', '장소 추천', '자유 게시판']
 
 const LOGIN_TOAST_MESSAGE = '로그인 후 이용 가능한 서비스입니다.'
-const BOARD_UNSUPPORTED_TOAST = 'v1에서는 자유 게시판만 지원합니다.'
 
 const BASE_TRAVEL_DESTINATIONS = [
   {
@@ -140,10 +139,6 @@ export default function HomePage() {
     showToast(LOGIN_TOAST_MESSAGE)
   }
 
-  const showUnsupportedToast = () => {
-    showToast(BOARD_UNSUPPORTED_TOAST)
-  }
-
   const handleSoloPlan = () => {
     if (!loggedIn) {
       showLoginToast()
@@ -165,7 +160,7 @@ export default function HomePage() {
       showLoginToast()
       return
     }
-    showUnsupportedToast()
+    navigate('/trips/new?travelMode=GROUP')
   }
 
   const handleViewAll = () => {

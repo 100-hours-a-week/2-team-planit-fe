@@ -7,7 +7,7 @@ import {
   fetchTripItineraries,
   updateTripDay,
 } from '../api/trips'
-import type { TripData } from '../api/trips'
+import type { CreateTripPayload, TripData } from '../api/trips'
 import AppHeader from '../components/AppHeader'
 import PlaceSearchPanel from '../components/PlaceSearchPanel'
 import type { PlaceSearchItem } from '../types/place'
@@ -137,6 +137,7 @@ const calcDays = (start: string, end: string) => {
 }
 
 type SubmitState = { loading: boolean; error: string }
+type TravelMode = 'SOLO' | 'GROUP'
 
 type PlaceItem = {
   id: string
@@ -174,6 +175,7 @@ export default function TripCreatePage() {
   const [arrivalHour, setArrivalHour] = useState('')
   const [departureHour, setDepartureHour] = useState('')
   const [budget, setBudget] = useState('')
+  const [headCount, setHeadCount] = useState('2')
   const [themes, setThemes] = useState<string[]>([])
   const [wantedPlaces, setWantedPlaces] = useState<PlaceItem[]>([])
 
@@ -199,6 +201,10 @@ export default function TripCreatePage() {
 
   const routeTripId = Number(params.tripId)
   const locationState = (location.state as TripRouteState | null) ?? null
+  const selectedTravelMode = (new URLSearchParams(location.search).get('travelMode') || 'SOLO')
+    .trim()
+    .toUpperCase() as TravelMode
+  const isGroupMode = selectedTravelMode === 'GROUP'
   const stateTripId = Number(locationState?.tripId)
   const queryReadonly = new URLSearchParams(location.search).get('readonly') === 'true'
   const isReadonlyTripView = queryReadonly || Boolean(locationState?.readonly)
@@ -246,6 +252,7 @@ export default function TripCreatePage() {
     arrivalHour !== '' &&
     departureHour !== '' &&
     isBudgetValid &&
+    (!isGroupMode || (Number.isInteger(Number(headCount)) && Number(headCount) >= 2)) &&
     themes.length > 0
 
   const currentHour = currentTime.getHours()
@@ -261,6 +268,7 @@ export default function TripCreatePage() {
     arrivalHour !== '' ||
     departureHour !== '' ||
     budget ||
+    (isGroupMode && headCount !== '2') ||
     themes.length > 0 ||
     wantedPlaces.length > 0
 
@@ -333,7 +341,7 @@ export default function TripCreatePage() {
       return
     }
 
-    const payload = {
+    const payload: CreateTripPayload = {
       title: title.trim(),
       arrivalDate,
       arrivalTime: String(arrivalHour).padStart(2, '0') + ':00',
@@ -344,6 +352,8 @@ export default function TripCreatePage() {
       totalBudget: budgetValue,
       travelTheme: themes,
       wantedPlace: wantedPlaces.map((place) => place.googlePlaceId),
+      travelMode: isGroupMode ? 'GROUP' : 'SOLO',
+      headCount: isGroupMode ? Number(headCount) : undefined,
     }
 
     try {
@@ -354,6 +364,16 @@ export default function TripCreatePage() {
       const normalizedTripId =
         typeof createdTripId === 'number' ? createdTripId : Number(createdTripId) || null
       setTripId(normalizedTripId)
+
+      if (isGroupMode) {
+        if (!normalizedTripId) {
+          setSubmitState({ loading: false, error: 'tripId가 없습니다.' })
+          setPage('form')
+          return
+        }
+        navigate(`/trips/${normalizedTripId}/waiting`, { replace: true })
+        return
+      }
 
       if (data?.itineraries?.length) {
         setTripData(data)
@@ -993,7 +1013,16 @@ export default function TripCreatePage() {
               <label>
                 인원수<span className="required">*</span>
               </label>
-              <input type="text" value="1" disabled />
+              {isGroupMode ? (
+                <input
+                  type="number"
+                  min={2}
+                  value={headCount}
+                  onChange={(event) => setHeadCount(event.target.value.replace(/\D/g, ''))}
+                />
+              ) : (
+                <input type="text" value="1" disabled />
+              )}
             </div>
           </div>
 
@@ -1114,7 +1143,7 @@ export default function TripCreatePage() {
             disabled={!requiredReady || submitState.loading}
             aria-disabled={!requiredReady || submitState.loading || !isCreateWindowOpen}
           >
-            입력 완료 &amp; 대기방 입장 →
+            {isGroupMode ? '입력 완료 & 대기방 입장 →' : '입력 완료 & 일정 생성 →'}
           </button>
           {!isCreateWindowOpenByTime && !BYPASS_CREATE_TIME_LIMIT && (
             <div className="helper warning">※ 일정 생성은 14:00~02:00에만 가능합니다.</div>
@@ -1123,6 +1152,9 @@ export default function TripCreatePage() {
             <div className="helper warning">※ 선택한 여행지의 destinationCode 매핑이 없습니다.</div>
           )}
           {!requiredReady && <div className="helper warning">※ 필수 입력 항목(*)을 모두 입력해주세요.</div>}
+          {isGroupMode && Number(headCount) < 2 && (
+            <div className="helper warning">※ 인원수는 팀장 포함 2명 이상이어야 합니다.</div>
+          )}
           {submitState.error && <div className="helper warning">{submitState.error}</div>}
         </section>
 

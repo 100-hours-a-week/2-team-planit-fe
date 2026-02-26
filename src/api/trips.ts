@@ -65,6 +65,8 @@ export type CreateTripPayload = {
   totalBudget: number
   travelTheme: string[]
   wantedPlace: string[]
+  travelMode?: 'SOLO' | 'GROUP'
+  headCount?: number
 }
 
 export async function createTrip(payload: CreateTripPayload): Promise<TripData> {
