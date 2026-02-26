@@ -23,6 +23,7 @@ export interface PostListItem {
   planThumbnailImageUrl?: string | null
   rating?: number | null
   googlePlaceId?: string | null
+  placeImageUrl?: string | null
 }
 
 export interface PostDetail {
