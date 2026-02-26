@@ -3,6 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { DEFAULT_PLAN_THUMBNAIL_URL } from '../constants/plan'
 import { resolveImageUrl } from '../utils/image.ts'
 import { getPosts } from '../api/posts'
 import type { PostListItem, SortParam } from '../api/posts'
@@ -542,8 +543,17 @@ export default function PostListPage() {
                 onClick={() => navigate(`/posts/${post.postId}`)}
               >
                 {(() => {
-                  const shouldShowImage =
-                    boardType !== '일정 공유' && Boolean(post.representativeImageUrl)
+                  const getCardImageUrl = () => {
+                    if (boardType === '일정 공유') {
+                      return undefined
+                    }
+                    if (boardType === '장소 추천') {
+                      return resolveImageUrl(post.placeImageUrl, DEFAULT_PLAN_THUMBNAIL_URL)
+                    }
+                    return post.representativeImageUrl ?? undefined
+                  }
+                  const cardImageUrl = getCardImageUrl()
+                  const shouldShowImage = boardType !== '일정 공유' && Boolean(cardImageUrl)
                   return (
                     <div
                       className={`post-card__media ${
@@ -551,7 +561,7 @@ export default function PostListPage() {
                       }`}
                       style={
                         shouldShowImage
-                          ? { backgroundImage: `url(${post.representativeImageUrl})` }
+                          ? { backgroundImage: `url(${cardImageUrl})` }
                           : undefined
                       }
                     >
