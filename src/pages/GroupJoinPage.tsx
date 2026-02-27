@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  fetchTripGroup,
   fetchGroupJoin,
   submitGroupJoin,
   type GroupJoinDetailResponse,
@@ -21,6 +22,38 @@ const THEMES = [
 ]
 
 const JOIN_POLL_INTERVAL_MS = 3000
+const DESTINATION_CODE_BY_LABEL: Record<string, string> = {
+  '가오슝, 대만': 'KAOHSIUNG_TW',
+  '괌, 미국': 'GUAM_US',
+  '나고야, 일본': 'NAGOYA_JP',
+  '나트랑, 베트남': 'NHA_TRANG_VN',
+  '다낭, 베트남': 'DA_NANG_VN',
+  '도쿄, 일본': 'TOKYO_JP',
+  '런던, 영국': 'LONDON_GB',
+  '로마, 이탈리아': 'ROME_IT',
+  '마닐라, 필리핀': 'MANILA_PH',
+  '마카오, 중국': 'MACAU_CN',
+  '바르셀로나, 스페인': 'BARCELONA_ES',
+  '방콕, 태국': 'BANGKOK_TH',
+  '보라카이, 필리핀': 'BORACAY_PH',
+  '보홀, 필리핀': 'BOHOL_PH',
+  '사이판, 미국': 'SAIPAN_US',
+  '삿포로, 일본': 'SAPPORO_JP',
+  '상하이, 중국': 'SHANGHAI_CN',
+  '세부, 필리핀': 'CEBU_PH',
+  '싱가포르, 싱가포르': 'SINGAPORE_SG',
+  '오사카, 일본': 'OSAKA_JP',
+  '오키나와, 일본': 'OKINAWA_JP',
+  '치앙마이, 태국': 'CHIANG_MAI_TH',
+  '코타키나발루, 말레이시아': 'KOTA_KINABALU_MY',
+  '쿠알라룸푸르, 말레이시아': 'KUALA_LUMPUR_MY',
+  '타이베이, 대만': 'TAIPEI_TW',
+  '파리, 프랑스': 'PARIS_FR',
+  '푸꾸옥, 베트남': 'PHU_QUOC_VN',
+  '하노이, 베트남': 'HANOI_VN',
+  '홍콩, 중국': 'HONG_KONG_CN',
+  '후쿠오카, 일본': 'FUKUOKA_JP',
+}
 
 type PlaceItem = {
   id: string
@@ -80,13 +113,14 @@ export default function GroupJoinPage() {
   const isExpired = detail?.status === 'EXPIRED' || isExpiredByDate
 
   useEffect(() => {
-    if (!submitted || !inviteCode || isExpired) return
+    const pollingTripId = detail?.tripId
+    if (!submitted || !pollingTripId || isExpired) return
     const intervalId = window.setInterval(async () => {
       try {
-        const latest = await fetchGroupJoin(inviteCode)
-        setDetail(latest)
-        if (latest.status === 'GENERATING' && latest.tripId) {
-          navigate(`/trips/${latest.tripId}/itineraries`, { replace: true })
+        const group = await fetchTripGroup(pollingTripId)
+        setDetail((prev) => ({ ...prev, ...group }))
+        if (group.status === 'GENERATING') {
+          navigate(`/trips/${pollingTripId}/itineraries`, { replace: true })
         }
       } catch {
         // keep polling silently
@@ -95,7 +129,7 @@ export default function GroupJoinPage() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [inviteCode, isExpired, navigate, submitted])
+  }, [detail?.tripId, isExpired, navigate, submitted])
 
   const requiredReady = themes.length > 0
 
@@ -207,7 +241,10 @@ export default function GroupJoinPage() {
               <section className="section">
                 <label>희망 장소</label>
                 <PlaceSearchPanel
-                  initialDestinationCode={detail?.destinationCode ?? ''}
+                  initialDestinationCode={
+                    detail?.destinationCode ??
+                    (detail?.travelCity ? DESTINATION_CODE_BY_LABEL[detail.travelCity] ?? '' : '')
+                  }
                   onPlaceSelected={(place: PlaceSearchItem) => {
                     setWantedPlaces((prev) => {
                       if (prev.some((item) => item.googlePlaceId === place.googlePlaceId)) {

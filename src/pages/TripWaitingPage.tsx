@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { fetchTripWaiting, type GroupWaitingResponse } from '../api/groups'
+import { cancelTripWaiting, fetchTripGroup, type GroupWaitingResponse } from '../api/groups'
 import './GroupFlowPage.css'
 
 const WAITING_POLL_INTERVAL_MS = 3000
@@ -8,8 +8,8 @@ const WAITING_POLL_INTERVAL_MS = 3000
 const getStatusLabel = (status?: string) => {
   if (status === 'WAITING') return '대기중'
   if (status === 'GENERATING') return '일정 생성중'
-  if (status === 'SUCCESS') return '생성 완료'
-  if (status === 'FAIL') return '생성 실패'
+  if (status === 'DONE') return '생성 완료'
+  if (status === 'CANCELED') return '취소됨'
   if (status === 'EXPIRED') return '초대 만료'
   return status || '-'
 }
@@ -39,7 +39,7 @@ export default function TripWaitingPage() {
       return
     }
     try {
-      const data = await fetchTripWaiting(numericTripId)
+      const data = await fetchTripGroup(numericTripId)
       setWaiting(data)
       if (!silent) {
         setError('')
@@ -138,9 +138,17 @@ export default function TripWaitingPage() {
                     <button
                       className="pill-button"
                       type="button"
-                      onClick={() => showToast('수정 기능은 대기방 단계에서만 노출됩니다.')}
+                      onClick={async () => {
+                        try {
+                          await cancelTripWaiting(numericTripId)
+                          showToast('대기 상태를 취소했습니다.')
+                          void loadWaiting()
+                        } catch {
+                          showToast('취소 권한이 없거나 요청에 실패했습니다.')
+                        }
+                      }}
                     >
-                      수정
+                      대기 취소
                     </button>
                   )}
                 </div>
