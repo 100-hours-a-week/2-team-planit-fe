@@ -3,6 +3,8 @@ import type { TripChatMessage } from '../api/chat'
 export type SenderNameCache = Record<number, string>
 export type SenderProfileCache = Record<number, string>
 
+const AI_PROFILE_IMAGE_URL = 'https://dgs44b7nvvjo3.cloudfront.net/ai.png'
+
 export const buildSenderNameCache = (messages: TripChatMessage[]): SenderNameCache => {
   const cache: SenderNameCache = {}
   messages.forEach((message) => {
@@ -36,6 +38,9 @@ export const resolveSenderProfileImageUrl = (
   message: TripChatMessage,
   profileCache: SenderProfileCache,
 ) => {
+  if (message.senderType === 'AI') {
+    return AI_PROFILE_IMAGE_URL
+  }
   if (message.senderProfileImageUrl?.trim()) return message.senderProfileImageUrl
   if (message.senderUserId && profileCache[message.senderUserId]) {
     return profileCache[message.senderUserId]
