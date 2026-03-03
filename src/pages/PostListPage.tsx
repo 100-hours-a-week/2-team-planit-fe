@@ -591,25 +591,27 @@ export default function PostListPage() {
                 onClick={() => navigate(`/posts/${post.postId}`)}
               >
                 {(() => {
-                  const isPlaceRecommendBoard = boardType === '장소 추천'
-                  const isPlanShare = boardType === '일정 공유'
-                  const placeImage = isPlaceRecommendBoard
-                    ? post.placeImageUrl ?? post.representativeImageUrl
-                    : undefined
-                  const planImage = isPlanShare
-                    ? post.planThumbnailImageUrl ?? DEFAULT_PLAN_THUMBNAIL_URL
-                    : undefined
-                  const representativeImage =
-                    !isPlaceRecommendBoard && !isPlanShare ? post.representativeImageUrl : undefined
-                  const imageUrl = placeImage ?? planImage ?? representativeImage
-                  const shouldShowImage = Boolean(imageUrl)
-                  const backgroundStyle = shouldShowImage ? { backgroundImage: `url(${imageUrl})` } : undefined
+                  const getCardImageUrl = () => {
+                    if (boardType === '일정 공유') {
+                      return undefined
+                    }
+                    if (boardType === '장소 추천') {
+                      return resolveImageUrl(post.placeImageUrl, DEFAULT_PLAN_THUMBNAIL_URL)
+                    }
+                    return post.representativeImageUrl ?? undefined
+                  }
+                  const cardImageUrl = getCardImageUrl()
+                  const shouldShowImage = boardType !== '일정 공유' && Boolean(cardImageUrl)
                   return (
                     <div
                       className={`post-card__media ${
                         shouldShowImage ? 'has-image' : 'no-image'
                       }`}
-                      style={backgroundStyle}
+                      style={
+                        shouldShowImage
+                          ? { backgroundImage: `url(${cardImageUrl})` }
+                          : undefined
+                      }
                     >
                       {!shouldShowImage && <span className="post-card__placeholder-text">PLANIT</span>}
                     </div>
