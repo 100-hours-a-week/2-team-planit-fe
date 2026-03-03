@@ -98,7 +98,7 @@ export default function AppHeader() {
   return (
     <header className="app-header">
       <h1 className="logo-title">
-        <button type="button" className="logo-button" onClick={() => window.location.reload()}>
+        <button type="button" className="logo-button" onClick={() => navigate("/")}>
           PlanIt
         </button>
       </h1>

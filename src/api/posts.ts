@@ -72,6 +72,7 @@ export interface PostDetail {
   placeImageUrl?: string | null
   city?: string | null
   country?: string | null
+  deleted?: boolean | null
 }
 
 export interface CommentItem {
