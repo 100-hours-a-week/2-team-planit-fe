@@ -443,11 +443,31 @@
   overflow-y: auto;
 }
 
+.planit-trip .chat-message-row {
+  display: flex;
+  width: 100%;
+}
+
+.planit-trip .chat-message-row.mine {
+  justify-content: flex-end;
+}
+
+.planit-trip .chat-message-row.other {
+  justify-content: flex-start;
+}
+
 .planit-trip .chat-message-item {
   border: 1px solid #e5e5e5;
   border-radius: 10px;
   padding: 8px 10px;
   background: #fafafa;
+  width: fit-content;
+  max-width: min(72%, 440px);
+}
+
+.planit-trip .chat-message-item.mine {
+  background: #fffbe6;
+  border-color: #f0d900;
 }
 
 .planit-trip .chat-message-item p {
@@ -463,6 +483,7 @@
   justify-content: space-between;
   gap: 8px;
   font-size: 12px;
+  flex-wrap: wrap;
 }
 
 .planit-trip .chat-sender {
@@ -495,8 +516,15 @@
   gap: 8px;
 }
 
-.planit-trip .chat-input-row input {
+.planit-trip .chat-input-row textarea {
   flex: 1;
+  min-height: 44px;
+  resize: vertical;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
 }
 
 .planit-trip .chat-empty {

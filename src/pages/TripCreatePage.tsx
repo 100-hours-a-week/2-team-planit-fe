@@ -200,7 +200,7 @@ export default function TripCreatePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const params = useParams<{ tripId?: string }>()
-  const { accessToken } = useAuth()
+  const { accessToken, user } = useAuth()
   const [title, setTitle] = useState('')
   const [travelCity, setTravelCity] = useState('')
   const [arrivalDate, setArrivalDate] = useState('')
@@ -234,6 +234,7 @@ export default function TripCreatePage() {
   const [chatConnectionError, setChatConnectionError] = useState('')
   const [chatConnected, setChatConnected] = useState(false)
   const [isGroupTrip, setIsGroupTrip] = useState(false)
+  const [isGroupTripChecked, setIsGroupTripChecked] = useState(false)
   const [editDrafts, setEditDrafts] = useState<Record<number, ActivityDraft>>({})
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const activeTabRef = useRef<'schedule' | 'chat'>('schedule')
@@ -498,18 +499,22 @@ export default function TripCreatePage() {
   useEffect(() => {
     if (!currentTripId || page !== 'schedule') {
       setIsGroupTrip(false)
+      setIsGroupTripChecked(false)
       return
     }
     let cancelled = false
+    setIsGroupTripChecked(false)
     const detectGroupTrip = async () => {
       try {
         const group = await fetchTripGroup(currentTripId)
         if (!cancelled) {
           setIsGroupTrip(Boolean(group?.inviteCode || group?.headCount))
+          setIsGroupTripChecked(true)
         }
       } catch {
         if (!cancelled) {
           setIsGroupTrip(false)
+          setIsGroupTripChecked(true)
         }
       }
     }
@@ -759,10 +764,10 @@ export default function TripCreatePage() {
 
   useEffect(() => {
     if (isReadonlyTripView) return
-    if (tripData?.isOwner === false) {
+    if (tripData?.isOwner === false && isGroupTripChecked && !isGroupTrip) {
       navigate('/', { replace: true })
     }
-  }, [isReadonlyTripView, tripData?.isOwner, navigate])
+  }, [isReadonlyTripView, tripData?.isOwner, isGroupTrip, isGroupTripChecked, navigate])
 
   const safeTitle = title.length > 15 ? `${title.slice(0, 15)}...` : title
   const periodLabel = arrivalDate && departureDate ? `${arrivalDate} ~ ${departureDate}` : ''
@@ -1010,6 +1015,7 @@ export default function TripCreatePage() {
           {activeTab === 'chat' ? (
             <TripChatPanel
               messages={chatMessages}
+              currentUserId={user?.id}
               loading={chatLoading}
               errorMessage={chatError}
               connectionErrorMessage={chatConnectionError}
