@@ -10,7 +10,6 @@ import {
 import type { CreateTripPayload, TripData } from '../api/trips'
 import { fetchTripGroup } from '../api/groups'
 import {
-  appendLimitedMessages,
   fetchTripChatMessages,
   fetchTripChatSummary,
   markTripChatRead,
@@ -78,6 +77,25 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 const CREATE_ALLOWED_START_HOUR = 14
 const CREATE_ALLOWED_END_HOUR = 2
 const ITINERARY_JOB_POLL_INTERVAL_MS = 3000
+
+const buildMessageKey = (message: TripChatMessage) => {
+  if (message.messageId !== undefined && message.messageId !== null) {
+    return String(message.messageId)
+  }
+  if (message.seq !== undefined && message.seq !== null) {
+    return `seq:${message.seq}`
+  }
+  return ''
+}
+
+const limitAndSortMessages = (messages: TripChatMessage[]) => {
+  const sorted = [...messages].sort((a, b) => {
+    const seqA = a.seq ?? Number.NEGATIVE_INFINITY
+    const seqB = b.seq ?? Number.NEGATIVE_INFINITY
+    return seqA - seqB
+  })
+  return sorted.slice(Math.max(sorted.length - CHAT_LIMIT, 0))
+}
 const ITINERARY_JOB_TIMEOUT_MS = 300000
 const CHAT_LIMIT = 50
 const BYPASS_CREATE_TIME_LIMIT = (() => {
@@ -233,6 +251,17 @@ export default function TripCreatePage() {
   const [chatError, setChatError] = useState('')
   const [chatConnectionError, setChatConnectionError] = useState('')
   const [chatConnected, setChatConnected] = useState(false)
+  const chatMessageIdsRef = useRef<Set<string>>(new Set())
+  const refreshChatMessageKeys = (messages: TripChatMessage[]) => {
+    const ids = new Set<string>()
+    messages.forEach((message) => {
+      const key = buildMessageKey(message)
+      if (key) {
+        ids.add(key)
+      }
+    })
+    chatMessageIdsRef.current = ids
+  }
   const [isGroupTrip, setIsGroupTrip] = useState(false)
   const [isGroupTripChecked, setIsGroupTripChecked] = useState(false)
   const [editDrafts, setEditDrafts] = useState<Record<number, ActivityDraft>>({})
@@ -346,7 +375,9 @@ export default function TripCreatePage() {
     setChatError('')
     try {
       const messages = await fetchTripChatMessages(currentTripId, CHAT_LIMIT)
-      setChatMessages(messages)
+      const limited = limitAndSortMessages(messages)
+      refreshChatMessageKeys(limited)
+      setChatMessages(limited)
       if (import.meta.env.DEV && !chatPayloadLogRef.current.rest && messages.length > 0) {
         const first = messages[0]
         console.info('[chat] history payload fields', {
@@ -562,7 +593,15 @@ export default function TripCreatePage() {
             })
             chatPayloadLogRef.current.realtime = true
           }
-          setChatMessages((prev) => appendLimitedMessages([...prev, message], CHAT_LIMIT))
+          const messageKey = buildMessageKey(message)
+          if (messageKey && chatMessageIdsRef.current.has(messageKey)) {
+            return
+          }
+          setChatMessages((prev) => {
+            const next = limitAndSortMessages([...prev, message])
+            refreshChatMessageKeys(next)
+            return next
+          })
           if (activeTabRef.current !== 'chat') {
             setChatUnreadCount((prev) => prev + 1)
           }
