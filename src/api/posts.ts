@@ -23,6 +23,7 @@ export interface PostListItem {
   planThumbnailImageUrl?: string | null
   rating?: number | null
   googlePlaceId?: string | null
+  placeImageUrl?: string | null
 }
 
 export interface PostDetail {
@@ -71,6 +72,7 @@ export interface PostDetail {
   placeImageUrl?: string | null
   city?: string | null
   country?: string | null
+  deleted?: boolean | null
 }
 
 export interface CommentItem {

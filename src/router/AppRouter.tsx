@@ -10,6 +10,8 @@ import ProfilePage from '../pages/ProfilePage'
 import TripCreatePage from '../pages/TripCreatePage'
 import PostCreatePage from '../pages/PostCreatePage'
 import PostEditPage from '../pages/PostEditPage'
+import TripWaitingPage from '../pages/TripWaitingPage'
+import GroupJoinPage from '../pages/GroupJoinPage'
 import PrivateRoute from './PrivateRoute'
 
 export default function AppRouter() {
@@ -19,6 +21,8 @@ export default function AppRouter() {
         <Route element={<PrivateRoute />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/trips/:tripId/itineraries" element={<TripCreatePage />} />
+          <Route path="/trips/:tripId/waiting" element={<TripWaitingPage />} />
+          <Route path="/groups/join/:inviteCode" element={<GroupJoinPage />} />
           <Route path="/posts" element={<PostListPage />} />
           <Route path="/posts/create" element={<PostCreatePage />} />
           <Route path="/posts/:id/edit" element={<PostEditPage />} />

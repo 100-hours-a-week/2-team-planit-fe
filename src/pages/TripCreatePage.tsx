@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   createTrip,
@@ -7,10 +7,21 @@ import {
   fetchTripItineraries,
   updateTripDay,
 } from '../api/trips'
-import type { TripData } from '../api/trips'
+import type { CreateTripPayload, TripData } from '../api/trips'
+import { fetchTripGroup } from '../api/groups'
+import {
+  fetchTripChatMessages,
+  fetchTripChatSummary,
+  markTripChatRead,
+  normalizeTripChatMessage,
+} from '../api/chat'
+import type { TripChatMessage } from '../api/chat'
 import AppHeader from '../components/AppHeader'
 import PlaceSearchPanel from '../components/PlaceSearchPanel'
+import TripChatPanel from '../components/TripChatPanel'
+import { authStore, useAuth } from '../store'
 import type { PlaceSearchItem } from '../types/place'
+import { connectStomp } from '../utils/stompLite'
 import './TripCreatePage.css'
 
 const CITY_OPTIONS = [
@@ -66,12 +77,50 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 const CREATE_ALLOWED_START_HOUR = 14
 const CREATE_ALLOWED_END_HOUR = 2
 const ITINERARY_JOB_POLL_INTERVAL_MS = 3000
+
+const buildMessageKey = (message: TripChatMessage) => {
+  if (message.messageId !== undefined && message.messageId !== null) {
+    return String(message.messageId)
+  }
+  if (message.seq !== undefined && message.seq !== null) {
+    return `seq:${message.seq}`
+  }
+  return ''
+}
+
+const limitAndSortMessages = (messages: TripChatMessage[]) => {
+  const sorted = [...messages].sort((a, b) => {
+    const seqA = a.seq ?? Number.NEGATIVE_INFINITY
+    const seqB = b.seq ?? Number.NEGATIVE_INFINITY
+    return seqA - seqB
+  })
+  return sorted.slice(Math.max(sorted.length - CHAT_LIMIT, 0))
+}
 const ITINERARY_JOB_TIMEOUT_MS = 300000
+const CHAT_LIMIT = 50
 const BYPASS_CREATE_TIME_LIMIT = (() => {
   const value = (import.meta.env.VITE_BYPASS_TRIP_CREATE_TIME_LIMIT as string | undefined)
     ?.trim()
     .toLowerCase()
   return value === 'true' || value === '1' || value === 'yes' || value === 'y'
+})()
+
+const WS_BASE_URL = (() => {
+  const configured = (import.meta.env.VITE_WS_BASE_URL as string | undefined)?.trim()
+  if (configured) return configured
+  const apiBaseUrl =
+    (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || 'https://planit-ai.store/api'
+  try {
+    const url = new URL(apiBaseUrl)
+    const contextPath = url.pathname.replace(/\/+$/, '')
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    url.pathname = `${contextPath}/ws/chat`.replace(/\/{2,}/g, '/')
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return ''
+  }
 })()
 
 const DESTINATION_CODE_BY_LABEL: Record<string, string> = {
@@ -137,6 +186,8 @@ const calcDays = (start: string, end: string) => {
 }
 
 type SubmitState = { loading: boolean; error: string }
+type TravelMode = 'SOLO' | 'GROUP'
+type StompConnection = ReturnType<typeof connectStomp>
 
 type PlaceItem = {
   id: string
@@ -167,6 +218,7 @@ export default function TripCreatePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const params = useParams<{ tripId?: string }>()
+  const { accessToken, user } = useAuth()
   const [title, setTitle] = useState('')
   const [travelCity, setTravelCity] = useState('')
   const [arrivalDate, setArrivalDate] = useState('')
@@ -174,6 +226,7 @@ export default function TripCreatePage() {
   const [arrivalHour, setArrivalHour] = useState('')
   const [departureHour, setDepartureHour] = useState('')
   const [budget, setBudget] = useState('')
+  const [headCount, setHeadCount] = useState('2')
   const [themes, setThemes] = useState<string[]>([])
   const [wantedPlaces, setWantedPlaces] = useState<PlaceItem[]>([])
 
@@ -191,14 +244,40 @@ export default function TripCreatePage() {
   const [showMap, setShowMap] = useState(false)
   const [showRegenModal, setShowRegenModal] = useState(false)
   const [showEditMode, setShowEditMode] = useState(false)
-  const [hasNewChat] = useState(false)
+  const [activeTab, setActiveTab] = useState<'schedule' | 'chat'>('schedule')
+  const [chatMessages, setChatMessages] = useState<TripChatMessage[]>([])
+  const [chatUnreadCount, setChatUnreadCount] = useState(0)
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatError, setChatError] = useState('')
+  const [chatConnectionError, setChatConnectionError] = useState('')
+  const [chatConnected, setChatConnected] = useState(false)
+  const chatMessageIdsRef = useRef<Set<string>>(new Set())
+  const refreshChatMessageKeys = (messages: TripChatMessage[]) => {
+    const ids = new Set<string>()
+    messages.forEach((message) => {
+      const key = buildMessageKey(message)
+      if (key) {
+        ids.add(key)
+      }
+    })
+    chatMessageIdsRef.current = ids
+  }
+  const [isGroupTrip, setIsGroupTrip] = useState(false)
+  const [isGroupTripChecked, setIsGroupTripChecked] = useState(false)
   const [editDrafts, setEditDrafts] = useState<Record<number, ActivityDraft>>({})
   const [currentTime, setCurrentTime] = useState(() => new Date())
+  const activeTabRef = useRef<'schedule' | 'chat'>('schedule')
+  const stompRef = useRef<StompConnection | null>(null)
+  const chatPayloadLogRef = useRef({ rest: false, realtime: false })
 
   const showWantedPlaceSection = true
 
   const routeTripId = Number(params.tripId)
   const locationState = (location.state as TripRouteState | null) ?? null
+  const selectedTravelMode = (new URLSearchParams(location.search).get('travelMode') || 'SOLO')
+    .trim()
+    .toUpperCase() as TravelMode
+  const isGroupMode = selectedTravelMode === 'GROUP'
   const stateTripId = Number(locationState?.tripId)
   const queryReadonly = new URLSearchParams(location.search).get('readonly') === 'true'
   const isReadonlyTripView = queryReadonly || Boolean(locationState?.readonly)
@@ -246,6 +325,7 @@ export default function TripCreatePage() {
     arrivalHour !== '' &&
     departureHour !== '' &&
     isBudgetValid &&
+    (!isGroupMode || (Number.isInteger(Number(headCount)) && Number(headCount) >= 2)) &&
     themes.length > 0
 
   const currentHour = currentTime.getHours()
@@ -261,6 +341,7 @@ export default function TripCreatePage() {
     arrivalHour !== '' ||
     departureHour !== '' ||
     budget ||
+    (isGroupMode && headCount !== '2') ||
     themes.length > 0 ||
     wantedPlaces.length > 0
 
@@ -277,6 +358,50 @@ export default function TripCreatePage() {
     setToast(message)
     window.setTimeout(() => setToast(''), 2500)
   }
+
+  const loadChatSummary = useCallback(async () => {
+    if (!currentTripId) return
+    try {
+      const unreadCount = await fetchTripChatSummary(currentTripId)
+      setChatUnreadCount(unreadCount)
+    } catch {
+      setChatUnreadCount(0)
+    }
+  }, [currentTripId])
+
+  const loadChatMessages = useCallback(async () => {
+    if (!currentTripId) return
+    setChatLoading(true)
+    setChatError('')
+    try {
+      const messages = await fetchTripChatMessages(currentTripId, CHAT_LIMIT)
+      const limited = limitAndSortMessages(messages)
+      refreshChatMessageKeys(limited)
+      setChatMessages(limited)
+      if (import.meta.env.DEV && !chatPayloadLogRef.current.rest && messages.length > 0) {
+        const first = messages[0]
+        console.info('[chat] history payload fields', {
+          senderNickname: first.senderNickname ?? null,
+          senderProfileImageUrl: first.senderProfileImageUrl ?? null,
+        })
+        chatPayloadLogRef.current.rest = true
+      }
+    } catch {
+      setChatError('메시지를 불러오지 못했습니다.')
+    } finally {
+      setChatLoading(false)
+    }
+  }, [currentTripId])
+
+  const markChatRead = useCallback(async () => {
+    if (!currentTripId) return
+    try {
+      await markTripChatRead(currentTripId)
+      setChatUnreadCount(0)
+    } catch {
+      // noop
+    }
+  }, [currentTripId])
 
   const handleSubmitClick = () => {
     if (!isCreateWindowOpen) {
@@ -333,7 +458,7 @@ export default function TripCreatePage() {
       return
     }
 
-    const payload = {
+    const payload: CreateTripPayload = {
       title: title.trim(),
       arrivalDate,
       arrivalTime: String(arrivalHour).padStart(2, '0') + ':00',
@@ -344,6 +469,8 @@ export default function TripCreatePage() {
       totalBudget: budgetValue,
       travelTheme: themes,
       wantedPlace: wantedPlaces.map((place) => place.googlePlaceId),
+      travelMode: isGroupMode ? 'GROUP' : 'SOLO',
+      headCount: isGroupMode ? Number(headCount) : undefined,
     }
 
     try {
@@ -354,6 +481,16 @@ export default function TripCreatePage() {
       const normalizedTripId =
         typeof createdTripId === 'number' ? createdTripId : Number(createdTripId) || null
       setTripId(normalizedTripId)
+
+      if (isGroupMode) {
+        if (!normalizedTripId) {
+          setSubmitState({ loading: false, error: 'tripId가 없습니다.' })
+          setPage('form')
+          return
+        }
+        navigate(`/trips/${normalizedTripId}/waiting`, { replace: true })
+        return
+      }
 
       if (data?.itineraries?.length) {
         setTripData(data)
@@ -382,6 +519,112 @@ export default function TripCreatePage() {
   }, [])
 
   useEffect(() => {
+    activeTabRef.current = activeTab
+  }, [activeTab])
+
+  useEffect(() => {
+    if (page !== 'schedule' || !currentTripId) return
+    void loadChatSummary()
+  }, [currentTripId, loadChatSummary, page])
+
+  useEffect(() => {
+    if (!currentTripId || page !== 'schedule') {
+      setIsGroupTrip(false)
+      setIsGroupTripChecked(false)
+      return
+    }
+    let cancelled = false
+    setIsGroupTripChecked(false)
+    const detectGroupTrip = async () => {
+      try {
+        const group = await fetchTripGroup(currentTripId)
+        if (!cancelled) {
+          setIsGroupTrip(Boolean(group?.inviteCode || group?.headCount))
+          setIsGroupTripChecked(true)
+        }
+      } catch {
+        if (!cancelled) {
+          setIsGroupTrip(false)
+          setIsGroupTripChecked(true)
+        }
+      }
+    }
+    void detectGroupTrip()
+    return () => {
+      cancelled = true
+    }
+  }, [currentTripId, page])
+
+  useEffect(() => {
+    if (page !== 'schedule') return
+    if (!currentTripId || !accessToken) {
+      setChatConnected(false)
+      return
+    }
+    if (!WS_BASE_URL) {
+      setChatConnected(false)
+      setChatConnectionError('채팅 연결 실패')
+      return
+    }
+
+    const token = authStore.accessToken
+    if (!token) {
+      setChatConnected(false)
+      return
+    }
+
+    const connection = connectStomp({
+      brokerURL: WS_BASE_URL,
+      token,
+      topic: `/topic/trips/${currentTripId}/chat`,
+      onConnect: () => {
+        setChatConnected(true)
+        setChatConnectionError('')
+      },
+      onMessage: (body) => {
+        try {
+          const parsed = JSON.parse(body) as unknown
+          const message = normalizeTripChatMessage(parsed)
+          if (!message) return
+          if (import.meta.env.DEV && !chatPayloadLogRef.current.realtime) {
+            console.info('[chat] realtime payload fields', {
+              senderNickname: message.senderNickname ?? null,
+              senderProfileImageUrl: message.senderProfileImageUrl ?? null,
+            })
+            chatPayloadLogRef.current.realtime = true
+          }
+          const messageKey = buildMessageKey(message)
+          if (messageKey && chatMessageIdsRef.current.has(messageKey)) {
+            return
+          }
+          setChatMessages((prev) => {
+            const next = limitAndSortMessages([...prev, message])
+            refreshChatMessageKeys(next)
+            return next
+          })
+          if (activeTabRef.current !== 'chat') {
+            setChatUnreadCount((prev) => prev + 1)
+          }
+        } catch {
+          // noop
+        }
+      },
+      onError: () => {
+        setChatConnected(false)
+        setChatConnectionError('채팅 연결 실패')
+      },
+    })
+
+    stompRef.current = connection
+
+    return () => {
+      stompRef.current = null
+      setChatConnected(false)
+      connection.disconnect()
+    }
+  }, [accessToken, currentTripId, page])
+
+  useEffect(() => {
     const stateTripData = locationState?.tripData
     if (stateTripData?.itineraries?.length) {
       applyFetchedTripData(stateTripData)
@@ -397,18 +640,37 @@ export default function TripCreatePage() {
       setPage('creating')
     }
 
+    const moveToGroupWaitingPageIfNeeded = async () => {
+      try {
+        const group = await fetchTripGroup(currentTripId)
+        if (group.status === 'WAITING' || group.status === 'CANCELED') {
+          navigate(`/trips/${currentTripId}/waiting`, { replace: true })
+          return true
+        }
+      } catch {
+        // Non-group trip or group API unavailable
+      }
+      return false
+    }
+
     const fetchMine = async (silent = false) => {
       try {
         const data = await fetchTripItineraries(currentTripId)
         if (data?.itineraries?.length) {
           applyFetchedTripData(data)
         } else if (!silent) {
-          moveToCreatingPage()
+          const movedToWaiting = await moveToGroupWaitingPageIfNeeded()
+          if (!movedToWaiting) {
+            moveToCreatingPage()
+          }
         }
       } catch (error) {
         const status = (error as { response?: { status?: number } })?.response?.status
         if (!silent && status === 404) {
-          moveToCreatingPage()
+          const movedToWaiting = await moveToGroupWaitingPageIfNeeded()
+          if (!movedToWaiting) {
+            moveToCreatingPage()
+          }
           return
         }
         if (!silent) {
@@ -429,7 +691,7 @@ export default function TripCreatePage() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [currentTripId, showEditMode])
+  }, [currentTripId, navigate, showEditMode])
 
   useEffect(() => {
     if (page !== 'creating' || !tripId) return
@@ -541,10 +803,10 @@ export default function TripCreatePage() {
 
   useEffect(() => {
     if (isReadonlyTripView) return
-    if (tripData?.isOwner === false) {
+    if (tripData?.isOwner === false && isGroupTripChecked && !isGroupTrip) {
       navigate('/', { replace: true })
     }
-  }, [isReadonlyTripView, tripData?.isOwner, navigate])
+  }, [isReadonlyTripView, tripData?.isOwner, isGroupTrip, isGroupTripChecked, navigate])
 
   const safeTitle = title.length > 15 ? `${title.slice(0, 15)}...` : title
   const periodLabel = arrivalDate && departureDate ? `${arrivalDate} ~ ${departureDate}` : ''
@@ -560,6 +822,34 @@ export default function TripCreatePage() {
     if (!a.startTime || !b.startTime) return 0
     return a.startTime.localeCompare(b.startTime)
   })
+
+  const openScheduleTab = () => {
+    setActiveTab('schedule')
+  }
+
+  const openChatTab = async () => {
+    if (!accessToken || !authStore.accessToken) {
+      showToast('로그인이 필요합니다')
+      return
+    }
+    setActiveTab('chat')
+    await loadChatMessages()
+    await markChatRead()
+  }
+
+  const sendChatMessage = (content: string) => {
+    if (!currentTripId) return
+    const connection = stompRef.current
+    if (!connection || !connection.isConnected()) {
+      setChatConnectionError('채팅 연결 실패')
+      return
+    }
+    try {
+      connection.publish(`/app/trips/${currentTripId}/chat.send`, JSON.stringify({ content }))
+    } catch {
+      setChatConnectionError('채팅 연결 실패')
+    }
+  }
 
   if (page === 'creating') {
     return (
@@ -624,10 +914,11 @@ export default function TripCreatePage() {
                   >
                     일정 삭제
                   </button>
-                  <button
-                    className="pill-button"
-                    disabled={!isReadonlyTripView && tripData?.isOwner === false}
-                    onClick={async () => {
+                  {!isGroupTrip && (
+                    <button
+                      className="pill-button"
+                      disabled={!isReadonlyTripView && tripData?.isOwner === false}
+                      onClick={async () => {
                       if (!showEditMode) {
                         const drafts: Record<number, ActivityDraft> = {}
                         sortedActivities.forEach((activity) => {
@@ -726,10 +1017,11 @@ export default function TripCreatePage() {
                         console.error('final updateTripDay catch', error)
                         showToast('일정 수정에 실패했습니다.')
                       }
-                    }}
-                  >
-                    {showEditMode ? '수정 완료' : '일정 수정'}
-                  </button>
+                      }}
+                    >
+                      {showEditMode ? '수정 완료' : '일정 수정'}
+                    </button>
+                  )}
                 </>
               )}
               <button className="pill-button" onClick={handlePrimaryHeaderAction}>
@@ -740,172 +1032,191 @@ export default function TripCreatePage() {
           {toast && <div className="toast">{toast}</div>}
 
           <div className="tab-row">
-            <button className="tab active" type="button">
+            <button
+              className={`tab ${activeTab === 'schedule' ? 'active' : ''}`}
+              type="button"
+              onClick={openScheduleTab}
+            >
               일정
             </button>
             <button
               type="button"
-              className={`tab${isReadonlyTripView ? ' disabled' : ''}`}
-              disabled={isReadonlyTripView}
-              aria-disabled={isReadonlyTripView}
+              className={`tab ${activeTab === 'chat' ? 'active' : ''}`}
+              onClick={() => {
+                void openChatTab()
+              }}
             >
               채팅
-              {hasNewChat && <span className="badge" />}
+              {chatUnreadCount > 0 && activeTab !== 'chat' && <span className="badge" />}
             </button>
           </div>
 
-          <div className="map-box" onClick={() => setShowMap(true)}>
-            <div className="map-placeholder">
-              <span>지도 보기 (클릭하여 확대)</span>
-            </div>
-          </div>
-
-          <div className="day-tabs">
-            {dayTabs.map((item) => (
-              <button
-                key={item.day}
-                className={`day-tab ${item.day === selectedDay ? 'active' : ''}`}
-                onClick={() => setSelectedDay(item.day)}
-              >
-                Day {item.day}
-              </button>
-            ))}
-          </div>
-
-          <div className="day-header">
-            <div className="day-label">Day {selectedDay}</div>
-            <div className="day-actions">
-              <button
-                type="button"
-                className={`pill-button${isReadonlyTripView ? ' disabled' : ''}`}
-                disabled={isReadonlyTripView}
-                onClick={() => {
-                  if (isReadonlyTripView) {
-                    return
-                  }
-                  showToast('미지원 기능입니다.')
-                }}
-              >
-                일정 재생성
-              </button>
-            </div>
-          </div>
-          <div className="day-subtitle">선택된 일자: Day {selectedDay}</div>
-
-          <div className="timeline">
-            {sortedActivities.map((activity, index) => {
-              const costLabel =
-                activity.cost === 0
-                  ? '무료'
-                  : activity.cost
-                    ? `${activity.cost.toLocaleString()}원`
-                    : '-'
-              const name = activity.placeName || activity.transport || '이동'
-              const memoText = activity.memo?.trim() || ''
-              const draft = activity.activityId ? editDrafts[activity.activityId] : undefined
-
-              return (
-                <div
-                  key={activity.activityId || `${activity.startTime}-${index}`}
-                  className={`activity-card ${activity.type?.toLowerCase?.() || ''}`}
-                >
-                  <div className="order">{index + 1}</div>
-                  <div className="activity-body">
-                    {showEditMode && activity.activityId ? (
-                      <>
-                        <div className="activity-edit-row">
-                          <select
-                            value={draft?.startTime ?? activity.startTime ?? ''}
-                            onChange={(event) =>
-                              setEditDrafts((prev) => ({
-                                ...prev,
-                                [activity.activityId as number]: {
-                                  ...(prev[activity.activityId as number] ?? {}),
-                                  startTime: event.target.value,
-                                },
-                              }))
-                            }
-                          >
-                            <option value="">시간 선택</option>
-                            {TIME_OPTIONS.map((time) => (
-                              <option key={time} value={time}>
-                                {time}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="activity-edit-row">
-                          <input
-                            type="text"
-                            placeholder="장소"
-                            value={draft?.placeName ?? activity.placeName ?? ''}
-                            onChange={(event) =>
-                              setEditDrafts((prev) => ({
-                                ...prev,
-                                [activity.activityId as number]: {
-                                  ...(prev[activity.activityId as number] ?? {}),
-                                  placeName: event.target.value,
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="activity-edit-row">
-                          <input
-                            type="text"
-                            placeholder="메모"
-                            value={draft?.memo ?? activity.memo ?? ''}
-                            onChange={(event) =>
-                              setEditDrafts((prev) => ({
-                                ...prev,
-                                [activity.activityId as number]: {
-                                  ...(prev[activity.activityId as number] ?? {}),
-                                  memo: event.target.value,
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="activity-edit-row">
-                          <input
-                            type="number"
-                            placeholder="비용"
-                            value={draft?.cost ?? (activity.cost != null ? String(activity.cost) : '')}
-                            onChange={(event) =>
-                              setEditDrafts((prev) => ({
-                                ...prev,
-                                [activity.activityId as number]: {
-                                  ...(prev[activity.activityId as number] ?? {}),
-                                  cost: event.target.value.replace(/\D/g, ''),
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      <button
-                        className="activity-readonly"
-                        onClick={() => {
-                          if (activity.googleMapUrl) {
-                            window.open(activity.googleMapUrl, '_blank')
-                          }
-                        }}
-                      >
-                        <div className="time">{activity.startTime}</div>
-                        <div className="name">{name}</div>
-                        {memoText && <div className="memo">{memoText}</div>}
-                        <div className="meta">
-                          <span />
-                          <span>{costLabel}</span>
-                        </div>
-                      </button>
-                    )}
-                  </div>
+          {activeTab === 'chat' ? (
+            <TripChatPanel
+              messages={chatMessages}
+              currentUserId={user?.id}
+              loading={chatLoading}
+              errorMessage={chatError}
+              connectionErrorMessage={chatConnectionError}
+              isConnected={chatConnected}
+              onSend={sendChatMessage}
+            />
+          ) : (
+            <>
+              <div className="map-box" onClick={() => setShowMap(true)}>
+                <div className="map-placeholder">
+                  <span>지도 보기 (클릭하여 확대)</span>
                 </div>
-              )
-            })}
-          </div>
+              </div>
+
+              <div className="day-tabs">
+                {dayTabs.map((item) => (
+                  <button
+                    key={item.day}
+                    className={`day-tab ${item.day === selectedDay ? 'active' : ''}`}
+                    onClick={() => setSelectedDay(item.day)}
+                  >
+                    Day {item.day}
+                  </button>
+                ))}
+              </div>
+
+              <div className="day-header">
+                <div className="day-label">Day {selectedDay}</div>
+                <div className="day-actions">
+                  <button
+                    type="button"
+                    className={`pill-button${isReadonlyTripView ? ' disabled' : ''}`}
+                    disabled={isReadonlyTripView}
+                    onClick={() => {
+                      if (isReadonlyTripView) {
+                        return
+                      }
+                      showToast('미지원 기능입니다.')
+                    }}
+                  >
+                    일정 재생성
+                  </button>
+                </div>
+              </div>
+              <div className="day-subtitle">선택된 일자: Day {selectedDay}</div>
+
+              <div className="timeline">
+                {sortedActivities.map((activity, index) => {
+                  const costLabel =
+                    activity.cost === 0
+                      ? '무료'
+                      : activity.cost
+                        ? `${activity.cost.toLocaleString()}원`
+                        : '-'
+                  const name = activity.placeName || activity.transport || '이동'
+                  const memoText = activity.memo?.trim() || ''
+                  const draft = activity.activityId ? editDrafts[activity.activityId] : undefined
+
+                  return (
+                    <div
+                      key={activity.activityId || `${activity.startTime}-${index}`}
+                      className={`activity-card ${activity.type?.toLowerCase?.() || ''}`}
+                    >
+                      <div className="order">{index + 1}</div>
+                      <div className="activity-body">
+                        {showEditMode && activity.activityId ? (
+                          <>
+                            <div className="activity-edit-row">
+                              <select
+                                value={draft?.startTime ?? activity.startTime ?? ''}
+                                onChange={(event) =>
+                                  setEditDrafts((prev) => ({
+                                    ...prev,
+                                    [activity.activityId as number]: {
+                                      ...(prev[activity.activityId as number] ?? {}),
+                                      startTime: event.target.value,
+                                    },
+                                  }))
+                                }
+                              >
+                                <option value="">시간 선택</option>
+                                {TIME_OPTIONS.map((time) => (
+                                  <option key={time} value={time}>
+                                    {time}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="activity-edit-row">
+                              <input
+                                type="text"
+                                placeholder="장소"
+                                value={draft?.placeName ?? activity.placeName ?? ''}
+                                onChange={(event) =>
+                                  setEditDrafts((prev) => ({
+                                    ...prev,
+                                    [activity.activityId as number]: {
+                                      ...(prev[activity.activityId as number] ?? {}),
+                                      placeName: event.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div className="activity-edit-row">
+                              <input
+                                type="text"
+                                placeholder="메모"
+                                value={draft?.memo ?? activity.memo ?? ''}
+                                onChange={(event) =>
+                                  setEditDrafts((prev) => ({
+                                    ...prev,
+                                    [activity.activityId as number]: {
+                                      ...(prev[activity.activityId as number] ?? {}),
+                                      memo: event.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div className="activity-edit-row">
+                              <input
+                                type="number"
+                                placeholder="비용"
+                                value={draft?.cost ?? (activity.cost != null ? String(activity.cost) : '')}
+                                onChange={(event) =>
+                                  setEditDrafts((prev) => ({
+                                    ...prev,
+                                    [activity.activityId as number]: {
+                                      ...(prev[activity.activityId as number] ?? {}),
+                                      cost: event.target.value.replace(/\D/g, ''),
+                                    },
+                                  }))
+                                }
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <button
+                            className="activity-readonly"
+                            onClick={() => {
+                              if (activity.googleMapUrl) {
+                                window.open(activity.googleMapUrl, '_blank')
+                              }
+                            }}
+                          >
+                            <div className="time">{activity.startTime}</div>
+                            <div className="name">{name}</div>
+                            {memoText && <div className="memo">{memoText}</div>}
+                            <div className="meta">
+                              <span />
+                              <span>{costLabel}</span>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
 
           {showMap && (
             <div className="modal-backdrop" onClick={() => setShowMap(false)}>
@@ -993,7 +1304,16 @@ export default function TripCreatePage() {
               <label>
                 인원수<span className="required">*</span>
               </label>
-              <input type="text" value="1" disabled />
+              {isGroupMode ? (
+                <input
+                  type="number"
+                  min={2}
+                  value={headCount}
+                  onChange={(event) => setHeadCount(event.target.value.replace(/\D/g, ''))}
+                />
+              ) : (
+                <input type="text" value="1" disabled />
+              )}
             </div>
           </div>
 
@@ -1114,7 +1434,7 @@ export default function TripCreatePage() {
             disabled={!requiredReady || submitState.loading}
             aria-disabled={!requiredReady || submitState.loading || !isCreateWindowOpen}
           >
-            입력 완료 &amp; 대기방 입장 →
+            {isGroupMode ? '입력 완료 & 대기방 입장 →' : '입력 완료 & 일정 생성 →'}
           </button>
           {!isCreateWindowOpenByTime && !BYPASS_CREATE_TIME_LIMIT && (
             <div className="helper warning">※ 일정 생성은 14:00~02:00에만 가능합니다.</div>
@@ -1123,6 +1443,9 @@ export default function TripCreatePage() {
             <div className="helper warning">※ 선택한 여행지의 destinationCode 매핑이 없습니다.</div>
           )}
           {!requiredReady && <div className="helper warning">※ 필수 입력 항목(*)을 모두 입력해주세요.</div>}
+          {isGroupMode && Number(headCount) < 2 && (
+            <div className="helper warning">※ 인원수는 팀장 포함 2명 이상이어야 합니다.</div>
+          )}
           {submitState.error && <div className="helper warning">{submitState.error}</div>}
         </section>
 
