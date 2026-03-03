@@ -178,6 +178,7 @@ const ScrollTopButton = () => {
 export default function PostListPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const initialSearchParams = new URLSearchParams(location.search)
   const { user } = useAuth()
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [boardType, setBoardType] = useState<BoardType>(BOARD_TYPES[0])
@@ -194,8 +195,10 @@ export default function PostListPage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const reloadTimeout = useRef<number | null>(null)
   const navigateTimeout = useRef<number | null>(null)
-  const [selectedCountry, setSelectedCountry] = useState<CountryKey | ''>('')
-  const [selectedCity, setSelectedCity] = useState('')
+  const initialCountryParam = initialSearchParams.get('country')
+  const initialCityParam = initialSearchParams.get('city')
+  const [selectedCountry, setSelectedCountry] = useState<CountryKey | ''>((initialCountryParam as CountryKey) ?? '')
+  const [selectedCity, setSelectedCity] = useState(initialCityParam ?? '')
 
   const showToast = (message: string) => {
     setToastInfo({ message, key: Date.now() })
@@ -353,12 +356,53 @@ export default function PostListPage() {
     setSearchError('')
   }
 
+  const buildListParams = (overrides: {
+    boardType?: BoardType
+    sort?: SortParam
+    country?: string | null
+    city?: string | null
+  }) => {
+    const params = new URLSearchParams(location.search)
+    const targetBoard = overrides.boardType ?? boardType
+    params.set('boardType', BOARD_TYPE_PARAM_MAP[targetBoard])
+    const targetSort = overrides.sort ?? sortOption
+    params.set('sort', targetSort)
+    const countryParam =
+      overrides.country !== undefined ? overrides.country : selectedCountry || null
+    if (targetBoard === '장소 추천' && countryParam) {
+      params.set('country', countryParam)
+    } else {
+      params.delete('country')
+    }
+    const cityParam = overrides.city !== undefined ? overrides.city : selectedCity || null
+    if (targetBoard === '장소 추천' && cityParam) {
+      params.set('city', cityParam)
+    } else {
+      params.delete('city')
+    }
+    return params
+  }
+
+  const syncListSearch = (overrides: {
+    boardType?: BoardType
+    sort?: SortParam
+    country?: string | null
+    city?: string | null
+  }) => {
+    const params = buildListParams(overrides)
+    const search = params.toString()
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true })
+  }
+
   const handleSortChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSortOption(event.target.value as SortParam)
+    const value = event.target.value as SortParam
+    setSortOption(value)
+    syncListSearch({ sort: value })
   }
 
   const handleBoardTabClick = (type: BoardType) => {
     setBoardType(type)
+    syncListSearch({ boardType: type, country: null, city: null })
   }
 
   const currentCityOptions: readonly CityOption[] = selectedCountry
@@ -366,12 +410,16 @@ export default function PostListPage() {
     : []
 
   const handleCountryChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedCountry(event.target.value as CountryKey | '')
+    const value = (event.target.value as CountryKey | '') || null
+    setSelectedCountry(value ?? '')
     setSelectedCity('')
+    syncListSearch({ country: value, city: null })
   }
 
   const handleCityChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedCity(event.target.value)
+    const value = event.target.value || null
+    setSelectedCity(value ?? '')
+    syncListSearch({ city: value })
   }
 
   useEffect(() => {
