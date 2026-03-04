@@ -62,7 +62,7 @@ export default function TripWaitingPage() {
   useEffect(() => {
     if (!waiting?.status) return
     if (waiting.status === 'GENERATING') {
-      navigate(`/trips/${numericTripId}/itineraries`, { replace: true })
+      navigate(`/trips/${numericTripId}/itineraries?travelMode=GROUP`, { replace: true })
     }
   }, [numericTripId, navigate, waiting?.status])
 
