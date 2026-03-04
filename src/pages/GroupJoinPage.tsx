@@ -120,7 +120,7 @@ export default function GroupJoinPage() {
         const group = await fetchTripGroup(pollingTripId)
         setDetail((prev) => ({ ...prev, ...group }))
         if (group.status === 'GENERATING') {
-          navigate(`/trips/${pollingTripId}/itineraries`, { replace: true })
+          navigate(`/trips/${pollingTripId}/itineraries?travelMode=GROUP`, { replace: true })
         }
       } catch {
         // keep polling silently
@@ -303,7 +303,7 @@ export default function GroupJoinPage() {
                       })
                       setDetail((prev) => ({ ...prev, ...response }))
                       if (response.status === 'GENERATING' && response.tripId) {
-                        navigate(`/trips/${response.tripId}/itineraries`, { replace: true })
+                        navigate(`/trips/${response.tripId}/itineraries?travelMode=GROUP`, { replace: true })
                         return
                       }
                       setSubmitted(true)

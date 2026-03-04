@@ -233,8 +233,6 @@ export default function TripCreatePage() {
   const [chatError, setChatError] = useState('')
   const [chatConnectionError, setChatConnectionError] = useState('')
   const [chatConnected, setChatConnected] = useState(false)
-  const [isGroupTrip, setIsGroupTrip] = useState(false)
-  const [isGroupTripChecked, setIsGroupTripChecked] = useState(false)
   const [editDrafts, setEditDrafts] = useState<Record<number, ActivityDraft>>({})
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const activeTabRef = useRef<'schedule' | 'chat'>('schedule')
@@ -497,34 +495,6 @@ export default function TripCreatePage() {
   }, [currentTripId, loadChatSummary, page])
 
   useEffect(() => {
-    if (!currentTripId || page !== 'schedule') {
-      setIsGroupTrip(false)
-      setIsGroupTripChecked(false)
-      return
-    }
-    let cancelled = false
-    setIsGroupTripChecked(false)
-    const detectGroupTrip = async () => {
-      try {
-        const group = await fetchTripGroup(currentTripId)
-        if (!cancelled) {
-          setIsGroupTrip(Boolean(group?.inviteCode || group?.headCount))
-          setIsGroupTripChecked(true)
-        }
-      } catch {
-        if (!cancelled) {
-          setIsGroupTrip(false)
-          setIsGroupTripChecked(true)
-        }
-      }
-    }
-    void detectGroupTrip()
-    return () => {
-      cancelled = true
-    }
-  }, [currentTripId, page])
-
-  useEffect(() => {
     if (page !== 'schedule') return
     if (!currentTripId || !accessToken) {
       setChatConnected(false)
@@ -762,13 +732,6 @@ export default function TripCreatePage() {
     }
   }, [page, tripId])
 
-  useEffect(() => {
-    if (isReadonlyTripView) return
-    if (tripData?.isOwner === false && isGroupTripChecked && !isGroupTrip) {
-      navigate('/', { replace: true })
-    }
-  }, [isReadonlyTripView, tripData?.isOwner, isGroupTrip, isGroupTripChecked, navigate])
-
   const safeTitle = title.length > 15 ? `${title.slice(0, 15)}...` : title
   const periodLabel = arrivalDate && departureDate ? `${arrivalDate} ~ ${departureDate}` : ''
   const scheduleTitle = tripData?.title?.trim() || safeTitle || '여행 일정'
@@ -875,7 +838,7 @@ export default function TripCreatePage() {
                   >
                     일정 삭제
                   </button>
-                  {!isGroupTrip && (
+                  {!isGroupMode && (
                     <button
                       className="pill-button"
                       disabled={!isReadonlyTripView && tripData?.isOwner === false}
