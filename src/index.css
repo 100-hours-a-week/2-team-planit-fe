@@ -1772,7 +1772,7 @@ select.accented {
 
 .comment-card__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
@@ -1807,6 +1807,7 @@ select.accented {
   font-size: 0.85rem;
   color: #c00;
   cursor: pointer;
+  align-self: center;
 }
 
 .comment-content {

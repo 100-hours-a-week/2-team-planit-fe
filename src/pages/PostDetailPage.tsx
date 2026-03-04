@@ -142,6 +142,13 @@ export default function PostDetailPage() {
         if (options?.signal?.aborted) {
           return
         }
+        if (response.deleted) {
+          detailRef.current = null
+          setDetail(null)
+          setError('삭제된 게시글입니다.')
+          setIsLoading(false)
+          return
+        }
         setDetail(response)
         detailRef.current = response
         setLikeCount(response.likeCount)
