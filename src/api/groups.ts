@@ -30,6 +30,11 @@ export type GroupJoinDetailResponse = {
   submittedCount?: number
   status?: GroupStatus
   expiresAt?: string | null
+  leaderTravelTheme?: string[]
+  leaderWantedPlace?: string[]
+  myTravelTheme?: string[]
+  myWantedPlace?: string[]
+  submitted?: boolean
   travelTheme?: string[]
   wantedPlace?: string[]
 }
