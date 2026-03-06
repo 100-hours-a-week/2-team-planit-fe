@@ -133,10 +133,18 @@ export default function GroupJoinPage() {
 
   const requiredReady = themes.length > 0
 
+  const leaderThemes = useMemo(() => {
+    return detail?.leaderTravelTheme?.length
+      ? detail.leaderTravelTheme
+      : detail?.travelTheme?.length
+        ? detail.travelTheme
+        : []
+  }, [detail?.leaderTravelTheme, detail?.travelTheme])
+
   const leaderTheme = useMemo(() => {
-    if (!detail?.travelTheme?.length) return '-'
-    return detail.travelTheme.join(', ')
-  }, [detail?.travelTheme])
+    if (!leaderThemes.length) return '-'
+    return leaderThemes.join(', ')
+  }, [leaderThemes])
 
   return (
     <main className="home-shell">
