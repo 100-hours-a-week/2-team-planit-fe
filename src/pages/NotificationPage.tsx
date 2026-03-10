@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { KEYWORD_SUBSCRIPTIONS_EVENT, loadPersistedKeywordSubscriptions, persistKeywordSubscriptions } from '../utils/keywordSubscriptions'
 import { useNavigate } from 'react-router-dom'
 import Toast from '../components/Toast'
+import Modal from '../components/Modal'
 import {
   getNotifications,
   getUnreadNotificationCount,
@@ -12,6 +14,12 @@ import type {
   NotificationType,
 } from '../api/notifications'
 import { useAuth } from '../store'
+import {
+  fetchKeywordSubscriptions,
+  createKeywordSubscription,
+  deleteKeywordSubscription,
+  type KeywordSubscription,
+} from '../api/keywords'
 
 const TYPE_LABELS: Record<NotificationType, string> = {
   KEYWORD: '키워드',
@@ -81,6 +89,10 @@ export default function NotificationPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [keywordModalOpen, setKeywordModalOpen] = useState(false)
+  const [keywordInput, setKeywordInput] = useState('')
+  const [keywordError, setKeywordError] = useState('')
+  const [subscriptions, setSubscriptions] = useState<KeywordSubscription[]>([])
   const [toastInfo, setToastInfo] = useState<{ message: string; key: number } | null>(null)
   const [markingId, setMarkingId] = useState<number | null>(null)
   const [markingAll, setMarkingAll] = useState(false)
@@ -115,6 +127,97 @@ export default function NotificationPage() {
 
   const showToast = (message: string) => {
     setToastInfo({ message, key: Date.now() })
+  }
+
+  const validateKeyword = (value: string) => {
+    const trimmed = value.trim()
+    if (trimmed.length < 2) {
+      return '최소 2글자 부터 검색 가능합니다.'
+    }
+    if (trimmed.length > 10) {
+      return '최대 10자까지 검색 가능합니다.'
+    }
+    if (/[ㄱ-ㅎ]/.test(trimmed)) {
+      return '올바른 검색어를 입력해주세요.'
+    }
+    if (!/^[가-힣a-zA-Z]+$/.test(trimmed)) {
+      return '특수문자는 사용할 수 없습니다. 한국어 또는 영어만 입력해주세요.'
+    }
+    return ''
+  }
+
+  const loadKeywordSubscriptions = useCallback(async () => {
+    try {
+      const list = await fetchKeywordSubscriptions()
+      setSubscriptions(list)
+      persistKeywordSubscriptions(list)
+    } catch {
+      showToast('키워드를 불러오는 데 실패했습니다.')
+    }
+  }, [])
+
+  const loadCachedKeywords = useCallback(() => {
+    const cached = loadPersistedKeywordSubscriptions()
+    if (cached) {
+      setSubscriptions(cached)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadCachedKeywords()
+    loadKeywordSubscriptions()
+  }, [loadCachedKeywords, loadKeywordSubscriptions])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return () => {}
+    }
+    const handler = (event: Event) => {
+      if (event instanceof CustomEvent && Array.isArray(event.detail)) {
+        setSubscriptions(event.detail)
+      }
+    }
+    window.addEventListener(KEYWORD_SUBSCRIPTIONS_EVENT, handler as EventListener)
+    return () => window.removeEventListener(KEYWORD_SUBSCRIPTIONS_EVENT, handler as EventListener)
+  }, [])
+
+  const handleKeywordChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setKeywordInput(event.target.value)
+    if (keywordError) {
+      setKeywordError('')
+    }
+  }
+
+  const handleAddKeyword = async () => {
+    const error = validateKeyword(keywordInput)
+    if (error) {
+      setKeywordError(error)
+      return
+    }
+    try {
+      await createKeywordSubscription(keywordInput.trim())
+      setKeywordInput('')
+      showToast('키워드가 등록되었습니다.')
+      loadKeywordSubscriptions()
+    } catch {
+      setKeywordError('키워드 등록에 실패했습니다.')
+    }
+  }
+
+  const handleDeleteKeyword = async (subscriptionId: number) => {
+    try {
+      await deleteKeywordSubscription(subscriptionId)
+      showToast('키워드가 삭제되었습니다.')
+      loadKeywordSubscriptions()
+    } catch {
+      showToast('키워드 삭제에 실패했습니다.')
+    }
+  }
+
+  const handleKeywordModalClose = () => {
+    setKeywordModalOpen(false)
+    setKeywordInput('')
+    setKeywordError('')
   }
 
   useEffect(() => {
@@ -284,6 +387,35 @@ export default function NotificationPage() {
         </div>
       </header>
 
+      <section className="keyword-panel">
+        <div className="keyword-panel__head">
+          <div>
+            <p className="keyword-panel__title">키워드 알림</p>
+            <p className="keyword-panel__subtitle">관심 키워드가 포함된 게시물이 생기면 알려드려요</p>
+          </div>
+          <button
+            type="button"
+            className="keyword-panel__button"
+            onClick={() => setKeywordModalOpen(true)}
+          >
+            키워드 설정
+          </button>
+        </div>
+        <div className="keyword-panel__content">
+          {subscriptions.length === 0 ? (
+            <p className="keyword-panel__empty">등록된 키워드가 없습니다.</p>
+          ) : (
+            <div className="keyword-panel__chips">
+              {subscriptions.map((subscription) => (
+                <span className="keyword-chip" key={subscription.id}>
+                  {subscription.keyword}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {toastInfo && (
         <Toast key={toastInfo.key} message={toastInfo.message} onClose={() => setToastInfo(null)} />
       )}
@@ -322,6 +454,51 @@ export default function NotificationPage() {
       {(loadingMore || (nextCursor !== null && notifications.length > 0)) && (
         <p className="notification-status">알림 더 불러오는 중…</p>
       )}
+      <Modal
+        open={keywordModalOpen}
+        title="키워드 알림 설정"
+        onConfirm={handleKeywordModalClose}
+        confirmLabel="닫기"
+        message={
+          <div className="keyword-modal">
+            <p className="keyword-modal__description">
+              키워드 알림은 제목이나 본문에 해당 키워드가 등장할 때 알림을 보냅니다.
+            </p>
+            <div className="keyword-modal__input">
+              <label htmlFor="keyword-input" className="sr-only">키워드</label>
+              <input
+                id="keyword-input"
+                type="text"
+                value={keywordInput}
+                onChange={handleKeywordChange}
+                placeholder="예: 제주도"
+              />
+              <button type="button" className="primary-btn" onClick={handleAddKeyword}>
+                등록
+              </button>
+            </div>
+            {keywordError && <p className="keyword-modal__error">{keywordError}</p>}
+            <ul className="keyword-modal__list">
+              {subscriptions.length === 0 ? (
+                <li className="keyword-modal__empty">등록된 키워드가 없습니다.</li>
+              ) : (
+                subscriptions.map((subscription) => (
+                  <li key={subscription.id} className="keyword-modal__item">
+                    <span>{subscription.keyword}</span>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => handleDeleteKeyword(subscription.id)}
+                    >
+                      삭제
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        }
+      />
     </main>
   )
 }

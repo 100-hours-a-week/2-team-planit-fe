@@ -186,6 +186,7 @@ export default function PostListPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -236,6 +237,7 @@ export default function PostListPage() {
   useEffect(() => {
     setPosts([])
     setHasMore(false)
+    setTotalPages(0)
     setError('')
     setPage(0)
   }, [boardType, sortOption, searchQuery, selectedCity, location.key])
@@ -264,8 +266,9 @@ export default function PostListPage() {
         if (cancelled) {
           return
         }
-        setPosts((prev) => (page === 0 ? response.items : [...prev, ...response.items]))
-        setHasMore(Boolean(response.hasNext))
+        setPosts((prev) => (page === 0 ? response.content : [...prev, ...response.content]))
+        setHasMore(!response.last)
+        setTotalPages(response.totalPages)
       } catch {
         if (cancelled) {
           return
@@ -289,7 +292,7 @@ export default function PostListPage() {
   }, [boardType, sortOption, searchQuery, page, selectedCity, location.key])
 
   useEffect(() => {
-    if (!hasMore || isLoading || isLoadingMore) {
+    if (!hasMore || isLoading || isLoadingMore || page >= totalPages - 1) {
       return undefined
     }
     const observer = new IntersectionObserver(
@@ -305,7 +308,7 @@ export default function PostListPage() {
       observer.observe(current)
     }
     return () => observer.disconnect()
-  }, [hasMore, isLoading, isLoadingMore])
+  }, [hasMore, isLoading, isLoadingMore, page, totalPages])
 
   const validateSearchTerm = (value: string): string => {
     if (!value) {
