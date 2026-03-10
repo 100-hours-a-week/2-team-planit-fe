@@ -128,12 +128,16 @@ export interface PresignedUrlResponse {
 
 const BASE_PATH = '/posts'
 
-export interface PostListResponse {
-  items: PostListItem[]
-  hasNext?: boolean
-  page?: number
-  size?: number
+export interface PageResponse<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  last: boolean
 }
+
+export type PostListResponse = PageResponse<PostListItem>
 
 export interface GetPostsParams {
   boardType?: string
@@ -145,7 +149,7 @@ export interface GetPostsParams {
 }
 
 export async function getPosts(params?: GetPostsParams): Promise<PostListResponse> {
-  const response = await api.get<PostListResponse>(BASE_PATH, {
+  const response = await api.get<PageResponse<PostListItem>>(BASE_PATH, {
     params,
   })
   return response.data
