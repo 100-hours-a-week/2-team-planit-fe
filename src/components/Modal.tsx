@@ -7,7 +7,7 @@ type Props = {
   confirmLabel?: string
   cancelLabel?: string
   onConfirm: () => void
-  onCancel: () => void
+  onCancel?: () => void
   danger?: boolean
 }
 
@@ -29,11 +29,13 @@ export default function Modal({
     <div className="modal-overlay">
       <div className="modal-card">
         {title && <h3>{title}</h3>}
-        {message && <p>{message}</p>}
+        {message && <div className="modal-message">{message}</div>}
         <div className="modal-actions">
-          <button type="button" className="secondary-btn" onClick={onCancel}>
-            {cancelLabel}
-          </button>
+          {cancelLabel && onCancel ? (
+            <button type="button" className="secondary-btn" onClick={onCancel}>
+              {cancelLabel}
+            </button>
+          ) : null}
           <button
             type="button"
             className={`primary-btn ${danger ? 'danger' : ''}`}

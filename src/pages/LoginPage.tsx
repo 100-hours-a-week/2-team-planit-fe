@@ -1,21 +1,14 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import AuthPageHeader from '../components/AuthPageHeader'
 import { login } from '../api/auth'
+import { fetchKeywordSubscriptions } from '../api/keywords'
+import { persistKeywordSubscriptions } from '../utils/keywordSubscriptions'
 import { useAuth } from '../store'
-
-type LoginLocationState = {
-  from?: {
-    pathname?: string
-    search?: string
-    hash?: string
-  }
-}
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { setAuth } = useAuth()
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
@@ -54,9 +47,13 @@ export default function LoginPage() {
         profileImageUrl: data.profileImageUrl ?? null,
       }
       setAuth({ user: userPayload, accessToken: data.accessToken })
-      const from = (location.state as LoginLocationState | null)?.from
-      const fromPath = from?.pathname ? `${from.pathname}${from.search ?? ''}${from.hash ?? ''}` : '/'
-      navigate(fromPath, { replace: true })
+      try {
+        const keywords = await fetchKeywordSubscriptions()
+        persistKeywordSubscriptions(keywords)
+      } catch {
+        // best effort only
+      }
+      navigate('/', { replace: true })
     } catch {
       setErrorMessage('*아이디 또는 비밀번호를 확인해주세요.')
     } finally {
