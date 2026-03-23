@@ -255,6 +255,7 @@ export default function TripCreatePage() {
     : Number.isFinite(stateTripId) && stateTripId > 0
       ? stateTripId
       : null
+  const showStandaloneHeader = !currentTripId
 
   const handlePrimaryHeaderAction = () => {
     if (isReadonlyTripView) {
@@ -778,7 +779,7 @@ export default function TripCreatePage() {
   if (page === 'creating') {
     return (
       <main className="home-shell">
-        <AppHeader />
+        {showStandaloneHeader && <AppHeader />}
         <div className="planit-trip">
           <div className="page creating">
             <header className="topbar">
@@ -810,7 +811,7 @@ export default function TripCreatePage() {
 
     return (
       <main className="home-shell">
-        <AppHeader />
+        {showStandaloneHeader && <AppHeader />}
         <div className="planit-trip">
           <div className="page schedule">
           <header className="schedule-header">
@@ -1179,7 +1180,7 @@ export default function TripCreatePage() {
 
   return (
     <main className="home-shell">
-      <AppHeader />
+      {showStandaloneHeader && <AppHeader />}
       <div className="planit-trip">
         <div className="page">
           <header className="topbar">
