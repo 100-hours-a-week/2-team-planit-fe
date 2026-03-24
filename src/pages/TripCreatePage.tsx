@@ -792,9 +792,22 @@ export default function TripCreatePage() {
               </button>
             </header>
             <div className="creating-body">
-              <p>여행 일정을 생성 중 입니다.</p>
-              <p>잠시만 기다려 주세요.</p>
-              <div className="dots">••••</div>
+              <div className="creating-visual" aria-hidden="true">
+                <div className="creating-orb">
+                  <span className="creating-bot">🤖</span>
+                </div>
+              </div>
+              <div className="creating-copy">
+                <p className="creating-title">AI가 최적의 경로를 생성 중입니다.</p>
+                <p className="creating-description">
+                  여행 기간과 테마, 예산, 가고 싶은 장소를 함께 고려해 동선을 정리하고 있어요.
+                </p>
+              </div>
+              <div className="dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
             </div>
           </div>
         </div>
@@ -962,6 +975,7 @@ export default function TripCreatePage() {
               type="button"
               onClick={openScheduleTab}
             >
+              <span className="tab-icon" aria-hidden="true">🗺</span>
               일정
             </button>
             <button
@@ -971,6 +985,7 @@ export default function TripCreatePage() {
                 void openChatTab()
               }}
             >
+              <span className="tab-icon" aria-hidden="true">💬</span>
               채팅
               {chatUnreadCount > 0 && activeTab !== 'chat' && <span className="badge" />}
             </button>
@@ -990,7 +1005,15 @@ export default function TripCreatePage() {
             <>
               <div className="map-box" onClick={() => setShowMap(true)}>
                 <div className="map-placeholder">
-                  <span>지도 보기 (클릭하여 확대)</span>
+                  <div className="map-route" aria-hidden="true">
+                    <span className="start" />
+                    <span className="end" />
+                  </div>
+                  <div className="map-placeholder-copy">
+                    <span className="map-icon" aria-hidden="true">🗺</span>
+                    <strong>지도 보기</strong>
+                    <span>클릭하여 확대</span>
+                  </div>
                 </div>
               </div>
 
@@ -1187,7 +1210,10 @@ export default function TripCreatePage() {
             <button className="icon-button" onClick={handleBack}>
               ←
             </button>
-            <h1>여행 정보 입력</h1>
+            <div className="title-block title-block-centered">
+              <h1>여행 정보 입력</h1>
+              <p>AI 플래너가 일정 컨셉에 맞춰 동선을 설계합니다.</p>
+            </div>
             <div />
           </header>
 
