@@ -21,6 +21,7 @@ export type TripActivity = {
   cost?: number
   placeName?: string
   transport?: string
+  googlePlaceId?: string
   googleMapUrl?: string
   memo?: string
   durationMinutes?: number

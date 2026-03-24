@@ -717,6 +717,7 @@
 }
 
 .planit-trip .map-box {
+  position: relative;
   border-radius: 32px;
   overflow: hidden;
   border: 1px solid rgba(241, 227, 170, 0.95);
@@ -725,73 +726,73 @@
   cursor: pointer;
 }
 
-.planit-trip .map-placeholder {
+.planit-trip .trip-google-map {
   min-height: 280px;
-  padding: 24px;
-  position: relative;
-  display: grid;
-  place-items: center;
   background:
     radial-gradient(circle at center, rgba(254, 229, 0, 0.12), transparent 24%),
     linear-gradient(180deg, #fffdf1 0%, #fff5cc 100%);
-  color: var(--trip-subtle);
 }
 
-.planit-trip .map-placeholder.large {
+.planit-trip .trip-google-map.is-expanded,
+.planit-trip .trip-google-map--fallback.is-expanded {
   min-height: 360px;
 }
 
-.planit-trip .map-route {
-  position: absolute;
-  top: 48px;
-  left: 12%;
-  right: 12%;
-  height: 88px;
+.planit-trip .trip-google-map__canvas {
+  width: 100%;
+  min-height: inherit;
 }
 
-.planit-trip .map-route::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-top: 7px dashed rgba(226, 186, 0, 0.34);
-  border-radius: 999px;
-  transform: translateY(22px) rotate(3deg);
+.planit-trip .trip-google-map--fallback {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
 }
 
-.planit-trip .map-route .start,
-.planit-trip .map-route .end {
-  position: absolute;
-  top: 16px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-}
-
-.planit-trip .map-route .start {
-  left: 0;
-  background: rgba(254, 229, 0, 0.56);
-}
-
-.planit-trip .map-route .end {
-  right: 0;
-  background: rgba(31, 35, 64, 0.32);
-}
-
-.planit-trip .map-placeholder-copy {
+.planit-trip .trip-google-map__message {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   text-align: center;
+  color: var(--trip-subtle);
 }
 
-.planit-trip .map-icon {
-  font-size: 42px;
-  opacity: 0.5;
+.planit-trip .trip-google-map__message strong {
+  color: var(--trip-ink);
+  font-size: 1rem;
+  font-weight: 800;
 }
 
-.planit-trip .map-placeholder-copy strong {
-  font-size: 1.08rem;
+.planit-trip .trip-google-map__message span {
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.planit-trip .map-preview-badge {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(241, 227, 170, 0.95);
+  box-shadow: 0 14px 28px rgba(92, 78, 0, 0.14);
+  pointer-events: none;
+}
+
+.planit-trip .map-preview-badge strong {
+  font-size: 0.92rem;
+  color: var(--trip-ink);
+  font-weight: 800;
+}
+
+.planit-trip .map-preview-badge span {
+  font-size: 0.78rem;
   color: var(--trip-subtle);
 }
 

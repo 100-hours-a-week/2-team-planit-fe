@@ -20,6 +20,7 @@ import type { TripChatMessage } from '../api/chat'
 import AppHeader from '../components/AppHeader'
 import PlaceSearchPanel from '../components/PlaceSearchPanel'
 import TripChatPanel from '../components/TripChatPanel'
+import TripGoogleMap from '../components/TripGoogleMap'
 import { authStore, useAuth } from '../store'
 import type { PlaceSearchItem } from '../types/place'
 import { connectStomp } from '../utils/stompLite'
@@ -747,6 +748,13 @@ export default function TripCreatePage() {
     if (!a.startTime || !b.startTime) return 0
     return a.startTime.localeCompare(b.startTime)
   })
+  const selectedDayPlaceIds = Array.from(
+    new Set(
+      sortedActivities
+        .map((activity) => activity.googlePlaceId?.trim() || '')
+        .filter(Boolean),
+    ),
+  )
 
   const openScheduleTab = () => {
     setActiveTab('schedule')
@@ -1004,16 +1012,10 @@ export default function TripCreatePage() {
           ) : (
             <>
               <div className="map-box" onClick={() => setShowMap(true)}>
-                <div className="map-placeholder">
-                  <div className="map-route" aria-hidden="true">
-                    <span className="start" />
-                    <span className="end" />
-                  </div>
-                  <div className="map-placeholder-copy">
-                    <span className="map-icon" aria-hidden="true">🗺</span>
-                    <strong>지도 보기</strong>
-                    <span>클릭하여 확대</span>
-                  </div>
+                <TripGoogleMap placeIds={selectedDayPlaceIds} />
+                <div className="map-preview-badge">
+                  <strong>지도 보기</strong>
+                  <span>클릭하여 확대</span>
                 </div>
               </div>
 
@@ -1175,9 +1177,7 @@ export default function TripCreatePage() {
                     ✕
                   </button>
                 </header>
-                <div className="map-placeholder large">
-                  <span>지도 영역</span>
-                </div>
+                <TripGoogleMap placeIds={selectedDayPlaceIds} expanded />
               </div>
             </div>
           )}
