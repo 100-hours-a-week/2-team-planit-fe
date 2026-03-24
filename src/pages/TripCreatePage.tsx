@@ -2,10 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   createTrip,
-  deleteTrip,
   fetchTripItineraryJob,
   fetchTripItineraries,
-  updateTripDay,
 } from '../api/trips'
 import type { CreateTripPayload, TripData } from '../api/trips'
 import { fetchTripGroup } from '../api/groups'
@@ -226,7 +224,7 @@ export default function TripCreatePage() {
   const [selectedDay, setSelectedDay] = useState(1)
   const [showMap, setShowMap] = useState(false)
   const [showRegenModal, setShowRegenModal] = useState(false)
-  const [showEditMode, setShowEditMode] = useState(false)
+  const [showEditMode] = useState(false)
   const [activeTab, setActiveTab] = useState<'schedule' | 'chat'>('schedule')
   const [chatMessages, setChatMessages] = useState<TripChatMessage[]>([])
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
@@ -824,12 +822,6 @@ export default function TripCreatePage() {
   }
 
   if (page === 'schedule') {
-    const rawDayId =
-      selectedItinerary?.dayId ??
-      selectedItinerary?.itineraryDayId ??
-      null
-    const dayId = typeof rawDayId === 'number' ? rawDayId : Number(rawDayId)
-
     return (
       <main className="home-shell">
         {showStandaloneHeader && <AppHeader />}
@@ -841,135 +833,6 @@ export default function TripCreatePage() {
               {schedulePeriod && <p>{schedulePeriod}</p>}
             </div>
             <div className="day-actions">
-              {!isReadonlyTripView && (
-                <>
-                  <button
-                    className="pill-button"
-                    disabled={!currentTripId || (!isReadonlyTripView && tripData?.isOwner === false)}
-                    onClick={async () => {
-                      if (!currentTripId) return
-                      try {
-                        await deleteTrip(currentTripId)
-                        showToast('일정이 삭제되었습니다.')
-                        navigate('/')
-                      } catch (error) {
-                        console.error('deleteTrip failed', error)
-                        showToast('일정 삭제에 실패했습니다.')
-                      }
-                    }}
-                  >
-                    일정 삭제
-                  </button>
-                  {!isGroupMode && (
-                    <button
-                      className="pill-button"
-                      disabled={!isReadonlyTripView && tripData?.isOwner === false}
-                      onClick={async () => {
-                      if (!showEditMode) {
-                        const drafts: Record<number, ActivityDraft> = {}
-                        sortedActivities.forEach((activity) => {
-                          if (!activity.activityId) return
-                          drafts[activity.activityId] = {
-                            placeName: activity.placeName ?? '',
-                            memo: activity.memo ?? '',
-                            cost: activity.cost != null ? String(activity.cost) : '',
-                            startTime: activity.startTime ?? '',
-                          }
-                        })
-                        setEditDrafts(drafts)
-                        setShowEditMode(true)
-                        return
-                      }
-
-                      if (!Number.isFinite(dayId) || dayId <= 0) {
-                        showToast('일정 정보가 없어 수정할 수 없습니다.')
-                        return
-                      }
-                      if (!currentTripId) {
-                        showToast('여행 정보가 없어 수정할 수 없습니다.')
-                        return
-                      }
-
-                      const updates = sortedActivities.reduce(
-                        (acc, activity) => {
-                          if (!activity.activityId) return acc
-                          const draft = editDrafts[activity.activityId]
-                          if (!draft) return acc
-
-                          const trimmedPlace = draft.placeName?.trim()
-                          const trimmedMemo = draft.memo?.trim()
-                          const nextCost =
-                            draft.cost && draft.cost.trim() !== ''
-                              ? Number.parseInt(draft.cost, 10)
-                              : undefined
-
-                          const changes: {
-                            activityId: number
-                            placeName?: string
-                            memo?: string
-                            cost?: number
-                            startTime?: string
-                          } = { activityId: activity.activityId }
-
-                          if (trimmedPlace && trimmedPlace !== (activity.placeName ?? '')) {
-                            changes.placeName = trimmedPlace
-                          }
-                          if (trimmedMemo && trimmedMemo !== (activity.memo ?? '')) {
-                            changes.memo = trimmedMemo
-                          }
-                          if (
-                            typeof nextCost === 'number' &&
-                            Number.isFinite(nextCost) &&
-                            nextCost !== activity.cost
-                          ) {
-                            changes.cost = nextCost
-                          }
-                          if (draft.startTime && draft.startTime !== (activity.startTime ?? '')) {
-                            changes.startTime = draft.startTime
-                          }
-
-                          const keys = Object.keys(changes)
-                          if (keys.length > 1) {
-                            acc.push(changes)
-                          }
-                          return acc
-                        },
-                        [] as {
-                          activityId: number
-                          placeName?: string
-                          memo?: string
-                          cost?: number
-                          startTime?: string
-                        }[],
-                      )
-
-                      if (updates.length === 0) {
-                        showToast('변경된 내용이 없습니다.')
-                        setShowEditMode(false)
-                        setEditDrafts({})
-                        return
-                      }
-
-                      try {
-                        await updateTripDay(currentTripId, dayId, updates)
-                        showToast('일정이 수정되었습니다.')
-                        setShowEditMode(false)
-                        setEditDrafts({})
-                        const latestData = await fetchTripItineraries(currentTripId)
-                        if (latestData?.itineraries?.length) {
-                          applyFetchedTripData(latestData)
-                        }
-                      } catch (error) {
-                        console.error('final updateTripDay catch', error)
-                        showToast('일정 수정에 실패했습니다.')
-                      }
-                      }}
-                    >
-                      {showEditMode ? '수정 완료' : '일정 수정'}
-                    </button>
-                  )}
-                </>
-              )}
               <button className="pill-button" onClick={handlePrimaryHeaderAction}>
                 {isReadonlyTripView ? '뒤로가기' : '홈으로'}
               </button>
@@ -1033,21 +896,7 @@ export default function TripCreatePage() {
 
               <div className="day-header">
                 <div className="day-label">Day {selectedDay}</div>
-                <div className="day-actions">
-                  <button
-                    type="button"
-                    className={`pill-button${isReadonlyTripView ? ' disabled' : ''}`}
-                    disabled={isReadonlyTripView}
-                    onClick={() => {
-                      if (isReadonlyTripView) {
-                        return
-                      }
-                      showToast('미지원 기능입니다.')
-                    }}
-                  >
-                    일정 재생성
-                  </button>
-                </div>
+                <div className="day-actions" />
               </div>
               <div className="day-subtitle">선택된 일자: Day {selectedDay}</div>
 
