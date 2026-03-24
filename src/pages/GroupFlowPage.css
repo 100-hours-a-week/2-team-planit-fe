@@ -6,8 +6,9 @@
 
 .group-flow .group-label {
   margin: 0 0 6px;
-  color: #7c7c7c;
+  color: #7a6500;
   font-size: 12px;
+  font-weight: 700;
 }
 
 .group-flow .waiting-status-grid {
@@ -16,10 +17,22 @@
   gap: 12px;
 }
 
+.group-flow .waiting-status-grid > div {
+  border: 1px solid rgba(242, 210, 0, 0.14);
+  border-radius: 20px;
+  padding: 16px;
+  background: linear-gradient(180deg, #fffef8 0%, #fff7d8 100%);
+  box-shadow: 0 12px 28px rgba(113, 92, 0, 0.06);
+}
+
 .group-flow .group-muted {
   margin-top: 8px;
   color: #7c7c7c;
   font-size: 13px;
+}
+
+.group-flow .waiting-status-grid strong {
+  font-size: 1.1rem;
 }
 
 @media (max-width: 640px) {
